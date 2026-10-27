@@ -496,6 +496,22 @@ body.modo-ancho { --ancho-max: 1680px; }
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 45%, transparent);
 }
 
+/* Rellenar grupos: etiqueta, número y botón en una línea; si no caben, bajan */
+.form-row-rellenar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-top: 4px;
+}
+
+.form-row-rellenar .form-label { margin-bottom: 0; }
+.form-row-rellenar .form-input { width: 90px; }
+
+#div-ver-paginas { margin-top: 16px; }
+
+.btn-secondary:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
+
 .form-hint { margin-top: 10px; font-size: 14px; color: var(--texto-3); }
 
 /* "Cambiar el orden" solo tiene sentido con dos archivos o más */

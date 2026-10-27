@@ -385,3 +385,14 @@ def test_editor_pdf_protegido(client):
     s = _crear_sesion(client, cifrado, contrasena='abc')
     assert s['desbloqueado'] is True
     assert not fitz.open('pdf', client.get(f"/api/edicion/{s['id']}/pdf").data).needs_pass
+
+
+def test_panel_division_ofrece_los_seis_modos(client):
+    html = client.get('/').get_data(as_text=True)
+    for valor in ('rango', 'todas', 'pares', 'impares', 'cada', 'personalizado'):
+        assert f'value="{valor}"' in html
+    # Un rango sigue siendo el que viene marcado
+    assert re.search(r'id="div-rango"[^>]*\bchecked\b', html)
+    assert 'id="div-paginas-por-archivo"' in html and 'value="2"' in html
+    assert 'id="div-grupos"' in html and 'id="div-rellenar"' in html
+    assert re.search(r'/static/js/grupos\.js\?v=\d+', html)

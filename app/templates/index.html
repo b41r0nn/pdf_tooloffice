@@ -128,7 +128,7 @@
   <section id="panel-division" class="panel" role="tabpanel" aria-labelledby="tab-division">
     <header class="panel-header">
       <h1 class="panel-title">Dividir PDF</h1>
-      <p class="panel-desc">Saca un rango de páginas, solo las pares o impares, o cada página en su propio archivo.</p>
+      <p class="panel-desc">Saca un rango de páginas, solo las pares o impares, cada página en su propio archivo, o corta un PDF largo cada cierto número de páginas o en los grupos que indiques.</p>
     </header>
 
     <ol class="hoja pasos">
@@ -173,6 +173,14 @@
             <input type="radio" name="modo-div" id="div-impares" value="impares">
             <label for="div-impares">Solo las impares</label>
           </div>
+          <div class="pill-option">
+            <input type="radio" name="modo-div" id="div-cada" value="cada">
+            <label for="div-cada">Cada N páginas</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="modo-div" id="div-personalizado" value="personalizado">
+            <label for="div-personalizado">Grupos personalizados</label>
+          </div>
         </div>
 
         <div id="div-rango-campos">
@@ -187,6 +195,28 @@
             </div>
           </div>
           <p class="form-hint">Por ejemplo, de la 2 a la 8 crea un PDF con esas 7 páginas.</p>
+        </div>
+
+        <div id="div-cada-campos" hidden>
+          <div class="form-group form-row-corta">
+            <label class="form-label" for="div-paginas-por-archivo">Páginas por archivo</label>
+            <input type="number" class="form-input" id="div-paginas-por-archivo" min="1" value="2" inputmode="numeric" aria-describedby="div-cuenta">
+          </div>
+          <p class="form-hint" id="div-cuenta" aria-live="polite"></p>
+        </div>
+
+        <div id="div-grupos-campos" hidden>
+          <div class="form-group form-row-corta">
+            <label class="form-label" for="div-grupos">Grupos</label>
+            <input type="text" class="form-input" id="div-grupos" placeholder="1-2,3-5,6" autocomplete="off" aria-describedby="div-grupos-cuenta">
+          </div>
+          <div class="form-row-rellenar">
+            <label class="form-label" for="div-rellenar-n">Rellenar con grupos de</label>
+            <input type="number" class="form-input" id="div-rellenar-n" min="1" value="2" inputmode="numeric">
+            <button type="button" class="btn-secondary" id="div-rellenar">Rellenar cada N páginas</button>
+          </div>
+          <p class="form-hint" id="div-grupos-cuenta" aria-live="polite"></p>
+          <button type="button" class="btn-secondary" id="div-ver-paginas" hidden>Ver páginas</button>
         </div>
       </li>
     </ol>
@@ -541,6 +571,7 @@
   <p class="pie-legal">© 2026, uso interno de REDIHOS S.A.S. Licencia CC BY-NC 4.0: solo uso no comercial.</p>
 </footer>
 
+<script src="{{ url_for('static', filename='js/grupos.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 </body>

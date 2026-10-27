@@ -148,6 +148,66 @@ def test_division_rango_y_modos(client):
     assert len(zipfile.ZipFile(io.BytesIO(r.data)).namelist()) == 5
 
 
+def test_division_cada_entrega_un_archivo_por_bloque(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'escaneo.pdf'),
+                                           'modo': 'cada', 'paginas_por_archivo': '2'})
+    assert r.status_code == 200
+    assert r.mimetype == 'application/zip'
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    assert zf.namelist() == [f'escaneo_{i:02d}.pdf' for i in range(1, 6)]
+    assert all(fitz.open('pdf', zf.read(n)).page_count == 2 for n in zf.namelist())
+
+
+def test_division_personalizado_respeta_los_grupos_y_su_orden(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'tanda.pdf'),
+                                           'modo': 'personalizado', 'grupos': '6-7,1-2,3-5'})
+    assert r.status_code == 200
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    assert [fitz.open('pdf', zf.read(n)).page_count for n in zf.namelist()] == [2, 2, 3]
+
+
+def test_division_personalizado_deja_fuera_las_paginas_no_listadas(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 't.pdf'),
+                                           'modo': 'personalizado', 'grupos': '1-3'})
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    assert len(zf.namelist()) == 1
+    assert fitz.open('pdf', zf.read(zf.namelist()[0])).page_count == 3
+
+
+@pytest.mark.parametrize('datos', [
+    {'modo': 'cada', 'paginas_por_archivo': '0'},
+    {'modo': 'cada', 'paginas_por_archivo': '-3'},
+    {'modo': 'cada', 'paginas_por_archivo': 'abc'},
+    {'modo': 'cada'},
+    {'modo': 'personalizado', 'grupos': '1-4,3-6'},
+    {'modo': 'personalizado', 'grupos': '1-2,40-50'},
+    {'modo': 'personalizado', 'grupos': ''},
+    {'modo': 'personalizado'},
+    {'modo': 'inventado'},
+])
+def test_division_rechaza_entradas_invalidas(client, datos):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'd.pdf'), **datos})
+    assert r.status_code == 400
+    assert 'error' in r.get_json()
+
+
+def test_division_cada_con_pdf_cifrado_pide_la_contrasena(client):
+    cifrado = client.post('/api/cifrado', data={'archivo': _archivo(pdf_bytes(paginas=4), 'c.pdf'),
+                                                'contrasena': 'clave', 'confirmar': 'clave'}).data
+    r = client.post('/api/division', data={'archivo': _archivo(cifrado, 'c.pdf'),
+                                           'modo': 'cada', 'paginas_por_archivo': '2'})
+    assert r.status_code == 400
+    assert 'contraseña' in r.get_json()['error']
+
+
+def test_division_nombre_con_ruta_no_escapa_del_zip(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=4), '../../factura.pdf'),
+                                           'modo': 'cada', 'paginas_por_archivo': '2'})
+    nombres = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
+    assert nombres == ['factura_01.pdf', 'factura_02.pdf']
+    assert not any('..' in n or '/' in n or '\\' in n for n in nombres)
+
+
 def test_cifrado_aes256(client):
     r = client.post('/api/cifrado', data={'archivo': _archivo(pdf_bytes(), 'c.pdf'),
                                           'contrasena': 'clave', 'confirmar': 'clave'})

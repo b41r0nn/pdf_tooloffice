@@ -166,7 +166,8 @@ def dividir_pdf(ruta, inicio, fin):
 
 def dividir_pdf_por_modo(ruta, modo):
     if modo not in MODOS_DIVISION:
-        raise ValueError(f'Modo de división no soportado. Opciones: rango, {", ".join(MODOS_DIVISION)}')
+        raise ValueError('Modo de división no soportado. Opciones: '
+                         f'rango, {", ".join(MODOS_DIVISION)}, cada, personalizado')
 
     with abrir_pdf(ruta) as src:
         total = src.page_count
@@ -254,6 +255,21 @@ def grupos_por_bloques(total, paginas_por_archivo):
         (inicio, min(inicio + paginas_por_archivo - 1, total))
         for inicio in range(1, total + 1, paginas_por_archivo)
     ]
+
+
+def dividir_por_grupos(ruta, grupos, base='documento'):
+    """ZIP con un PDF por grupo (inicio, fin; páginas desde 1, ambas incluidas), en el orden dado."""
+    if not grupos:
+        raise ValueError('No hay páginas para dividir')
+
+    ancho = max(2, len(str(len(grupos))))
+    out = io.BytesIO()
+    with abrir_pdf(ruta) as src, zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for numero, (inicio, fin) in enumerate(grupos, start=1):
+            with fitz.open() as salida:
+                salida.insert_pdf(src, from_page=inicio - 1, to_page=fin - 1)
+                zf.writestr(f'{base}_{numero:0{ancho}d}.pdf', _guardar(salida))
+    return out.getvalue()
 
 
 # ── Conversión ────────────────────────────────────────────────────

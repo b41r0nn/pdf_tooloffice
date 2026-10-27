@@ -208,9 +208,10 @@ def analizar_grupos(texto, total):
 
     grupos = []
     for trozo in trozos:
-        m = re.fullmatch(r'([0-9]+)(?:-([0-9]+))?', trozo)
+        m = re.fullmatch(r'([0-9]{1,6})(?:-([0-9]{1,6}))?', trozo)
         if not m:
-            raise ValueError(f'«{trozo}» no es un grupo válido; escribe un número o un tramo como 3-5.')
+            visto = trozo if len(trozo) <= 40 else trozo[:40] + '…'
+            raise ValueError(f'«{visto}» no es un grupo válido; escribe un número o un tramo como 3-5.')
         inicio = int(m.group(1))
         fin = int(m.group(2)) if m.group(2) else inicio
         grupos.append((inicio, fin))

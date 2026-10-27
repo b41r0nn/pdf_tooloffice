@@ -41,6 +41,44 @@ def test_analizar_grupos_rechaza_texto_invalido(texto):
         analizar_grupos(texto, 10)
 
 
+def test_analizar_grupos_tolera_trozos_vacios_intermedios():
+    assert analizar_grupos('1,,2', 10) == [(1, 1), (2, 2)]
+
+
+def test_analizar_grupos_rechaza_espacios_alrededor_del_guion():
+    with pytest.raises(ValueError, match='válido'):
+        analizar_grupos('1 - 2', 10)
+
+
+@pytest.mark.parametrize(
+    'texto',
+    ['9' * 5000, '1-' + '9' * 4400, '1234567'],
+    ids=['5000_digitos', 'tramo_con_4400_digitos', '7_digitos'],
+)
+def test_analizar_grupos_rechaza_numeros_de_mas_de_6_digitos_con_mensaje_en_espanol(texto):
+    # Sin tope de dígitos, int() lanzaría su propio ValueError en inglés
+    with pytest.raises(ValueError, match='no es un grupo válido'):
+        analizar_grupos(texto, 10)
+
+
+def test_analizar_grupos_acepta_numeros_de_6_digitos_en_el_limite():
+    assert analizar_grupos('1-999999', 999999) == [(1, 999999)]
+
+
+def test_analizar_grupos_recorta_a_40_caracteres_el_trozo_del_mensaje():
+    with pytest.raises(ValueError) as error:
+        analizar_grupos('x' * 100, 10)
+    mensaje = str(error.value)
+    assert '«' + 'x' * 40 + '…»' in mensaje
+    assert 'x' * 41 not in mensaje
+
+
+def test_analizar_grupos_no_recorta_un_trozo_de_40_caracteres():
+    with pytest.raises(ValueError) as error:
+        analizar_grupos('x' * 40, 10)
+    assert '«' + 'x' * 40 + '»' in str(error.value)
+
+
 def test_analizar_grupos_rechaza_mas_de_500_grupos():
     with pytest.raises(ValueError, match='500'):
         analizar_grupos(','.join(str(i) for i in range(1, 502)), 600)

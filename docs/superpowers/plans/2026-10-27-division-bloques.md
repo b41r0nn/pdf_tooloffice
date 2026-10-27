@@ -94,7 +94,8 @@ def test_analizar_grupos_permite_dejar_paginas_fuera():
 
 
 def test_analizar_grupos_rechaza_solapamiento_y_nombra_la_pagina():
-    with pytest.raises(ValueError, match='4'):
+    # '1-4' y '3-6' se pisan en la 3 y en la 4; el mensaje nombra la primera, la 3
+    with pytest.raises(ValueError, match=r'\b3\b'):
         analizar_grupos('1-4,3-6', 10)
 
 
@@ -163,7 +164,7 @@ El solapamiento se busca por conjunto de páginas, no comparando vecinos, porque
 - [ ] **Step 4: Comprobar que pasan**
 
 Run: `python -m pytest tests/test_division.py -q`
-Expected: PASS, 20 pruebas
+Expected: PASS, 22 pruebas (13 sueltas más 7 y 2 de los dos `parametrize`)
 
 - [ ] **Step 5: Confirmar**
 
@@ -281,7 +282,7 @@ Añadir `analizar_grupos`, `grupos_por_bloques` y `dividir_por_grupos` a la list
 - [ ] **Step 5: Comprobar que pasan, y que no se rompió nada**
 
 Run: `python -m pytest -q`
-Expected: PASS — las 105 de antes más las nuevas, 3 omitidas
+Expected: PASS. El punto de partida de la rama eran 102 que pasan y 3 omitidas; ninguna de esas 102 debe cambiar de estado.
 
 - [ ] **Step 6: Confirmar**
 

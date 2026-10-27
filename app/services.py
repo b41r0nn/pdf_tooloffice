@@ -12,6 +12,7 @@ import io
 import logging
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,8 @@ log = logging.getLogger(__name__)
 
 NIVELES_COMPRESION = ('baja', 'media', 'alta', 'ultra')
 MODOS_DIVISION = ('todas', 'pares', 'impares')
+MAX_ARCHIVOS_DIVISION = 500
+MAX_TEXTO_GRUPOS = 10_000
 
 # ── Validación ────────────────────────────────────────────────────
 
@@ -186,6 +189,70 @@ def dividir_pdf_por_modo(ruta, modo):
             raise ValueError('No hay páginas para el modo seleccionado')
         src.select(indices)
         return _guardar(src), 'pdf'
+
+
+def analizar_grupos(texto, total):
+    """
+    Convierte '1-2,3-5,6' en [(1, 2), (3, 5), (6, 6)] (páginas desde 1, ambas incluidas,
+    en el orden escrito). Se pueden dejar páginas fuera y escribir los grupos en cualquier
+    orden, pero una página no puede estar en dos grupos.
+    Lanza ValueError con un mensaje pensado para quien lo lee en pantalla.
+    """
+    if len(texto) > MAX_TEXTO_GRUPOS:
+        raise ValueError('El texto de los grupos es demasiado largo.')
+
+    trozos = [t.strip() for t in texto.split(',')]
+    trozos = [t for t in trozos if t]
+    if not trozos:
+        raise ValueError('Escribe al menos un grupo de páginas, por ejemplo 1-2,3-5,6.')
+
+    grupos = []
+    for trozo in trozos:
+        m = re.fullmatch(r'([0-9]+)(?:-([0-9]+))?', trozo)
+        if not m:
+            raise ValueError(f'«{trozo}» no es un grupo válido; escribe un número o un tramo como 3-5.')
+        inicio = int(m.group(1))
+        fin = int(m.group(2)) if m.group(2) else inicio
+        grupos.append((inicio, fin))
+
+    for inicio, fin in grupos:
+        for pagina in (inicio, fin):
+            if pagina < 1 or pagina > total:
+                raise ValueError(f'La página {pagina} no existe; el documento tiene de la 1 a la {total}.')
+
+    for inicio, fin in grupos:
+        if inicio > fin:
+            raise ValueError(f'El grupo {inicio}-{fin} está al revés: la página inicial es mayor que la final.')
+
+    if len(grupos) > MAX_ARCHIVOS_DIVISION:
+        raise ValueError(f'Hay {len(grupos)} grupos, más de los {MAX_ARCHIVOS_DIVISION} permitidos.')
+
+    usadas = set()
+    for inicio, fin in grupos:
+        for pagina in range(inicio, fin + 1):
+            if pagina in usadas:
+                raise ValueError(f'La página {pagina} está en más de un grupo.')
+            usadas.add(pagina)
+
+    return grupos
+
+
+def grupos_por_bloques(total, paginas_por_archivo):
+    """Parte `total` páginas en bloques de `paginas_por_archivo`; el último puede quedar más corto."""
+    if paginas_por_archivo < 1:
+        raise ValueError('Las páginas por archivo deben ser al menos 1.')
+
+    cantidad = -(-total // paginas_por_archivo)  # división hacia arriba
+    if cantidad > MAX_ARCHIVOS_DIVISION:
+        raise ValueError(
+            f'Saldrían {cantidad} archivos, más de los {MAX_ARCHIVOS_DIVISION} permitidos. '
+            'Usa «Cada página por separado».'
+        )
+
+    return [
+        (inicio, min(inicio + paginas_por_archivo - 1, total))
+        for inicio in range(1, total + 1, paginas_por_archivo)
+    ]
 
 
 # ── Conversión ────────────────────────────────────────────────────

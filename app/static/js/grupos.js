@@ -12,13 +12,18 @@
  * A diferencia del Python, estas funciones no lanzan excepciones: devuelven
  * {grupos: [[ini, fin], …]} o {error: 'mensaje'}, porque se recalculan a cada tecla.
  *
- * Diferencias conocidas que solo afectan al texto de un aviso, no a si algo es válido:
- * el trozo mostrado se corta por unidades UTF-16 (Python, por puntos de código) y
- * trim() de JavaScript quita algún espacio exótico más que str.strip() de Python.
+ * Diferencia conocida que solo afecta al texto de un aviso, no a si algo es válido:
+ * el trozo mostrado se corta por unidades UTF-16 (Python, por puntos de código).
  */
 
 const MAX_ARCHIVOS_DIVISION = 500;
 const MAX_TEXTO_GRUPOS = 10000;
+
+// Caracteres que se recortan alrededor de cada trozo: la unión de lo que recortan trim() de
+// JavaScript y str.strip() de Python, más el BOM (U+FEFF) que llega al pegar desde Excel o
+// el bloc de notas. Tiene que ir en pareja con _ESPACIOS_GRUPOS de app/services.py: si
+// difieren, el navegador y el servidor no aceptarían lo mismo.
+const RECORTE_GRUPOS = /^[\t\n\v\f\r\x1c-\x1f \x85\xa0\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}]+|[\t\n\v\f\r\x1c-\x1f \x85\xa0\u{1680}\u{2000}-\u{200a}\u{2028}\u{2029}\u{202f}\u{205f}\u{3000}\u{feff}]+$/gu;
 
 const TRAMO_GRUPO = /^([0-9]{1,6})(?:-([0-9]{1,6}))?$/;
 
@@ -29,7 +34,7 @@ function analizarGrupos(texto, total) {
     return { error: 'El texto de los grupos es demasiado largo.' };
   }
 
-  const trozos = texto.split(',').map((t) => t.trim()).filter((t) => t);
+  const trozos = texto.split(',').map((t) => t.replace(RECORTE_GRUPOS, '')).filter((t) => t);
   if (trozos.length === 0) {
     return { error: 'Escribe al menos un grupo de páginas, por ejemplo 1-2,3-5,6.' };
   }

@@ -48,6 +48,17 @@ CASOS_ANALIZAR = [
     (','.join(str(i) for i in range(1, 502)), 1000),
     ('1,' * 6000, 10),
     ('   ', 10),
+    # Pegar desde Excel o el bloc de notas: BOM, y controles que Python recorta y JS no (o al revés).
+    ('\U0000feff1', 10),
+    ('1,\x1c', 10),
+    ('\x851', 10),
+    # Fallos mezclados: el orden entre comprobaciones decide qué mensaje se lee.
+    ('x,9', 5),         # formato antes que página fuera de rango
+    ('5-3,x', 10),      # formato antes que grupo al revés
+    ('9,3-1', 5),       # página fuera de rango antes que grupo al revés
+    ('3-1,9', 5),       # idem, con el grupo al revés escrito primero
+    ('1-3,2-4,9', 5),   # página fuera de rango antes que solapamiento
+    ('1,' * 501 + '1', 10),  # cantidad de grupos antes que solapamiento
 ]
 CASOS_BLOQUES = [(10, 0), (600, 1), (10, 3), (0, 3)]
 
@@ -99,3 +110,31 @@ def test_grupos_js_da_los_mismos_resultados_y_mensajes_que_python(tmp_path):
     analizar_js, bloques_js = _node(tmp_path, GUION_PARIDAD, json.dumps(casos))
     assert analizar_js == [_python(analizar_grupos, t, n) for t, n in CASOS_ANALIZAR]
     assert bloques_js == [_python(grupos_por_bloques, t, p) for t, p in CASOS_BLOQUES]
+
+
+GUION_ESPACIOS = '''
+const g = require(process.argv[2]);
+const aceptados = [];
+for (let c = 0; c < 0x10000; c++) {
+  if (c >= 0xd800 && c <= 0xdfff) continue;
+  const ch = String.fromCharCode(c);
+  if (!g.analizarGrupos(ch + '1' + ch, 5).error) aceptados.push(c);
+}
+console.log(JSON.stringify(aceptados));
+'''
+
+
+@pytest.mark.skipif(not shutil.which('node'), reason='node no está instalado')
+def test_grupos_js_recorta_los_mismos_caracteres_que_python(tmp_path):
+    aceptados_js = _node(tmp_path, GUION_ESPACIOS)
+    aceptados_py = []
+    for c in range(0x10000):
+        if 0xD800 <= c <= 0xDFFF:
+            continue
+        try:
+            analizar_grupos(chr(c) + '1' + chr(c), 5)
+            aceptados_py.append(c)
+        except ValueError:
+            pass
+    assert aceptados_js == aceptados_py
+    assert 0xFEFF in aceptados_js and 0x1C in aceptados_js and 0x85 in aceptados_js

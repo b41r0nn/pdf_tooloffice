@@ -46,6 +46,15 @@ NIVELES_COMPRESION = ('baja', 'media', 'alta', 'ultra')
 MODOS_DIVISION = ('todas', 'pares', 'impares')
 MAX_ARCHIVOS_DIVISION = 500
 MAX_TEXTO_GRUPOS = 10_000
+# Caracteres que se recortan alrededor de cada trozo del texto de grupos: la unión de lo que
+# recortan str.strip() de Python y trim() de JavaScript, más el BOM (U+FEFF) que llega al
+# pegar desde Excel o el bloc de notas. Tiene que ir en pareja con ESPACIOS_GRUPOS de
+# app/static/js/grupos.js: si difieren, el navegador y el servidor no aceptarían lo mismo.
+_ESPACIOS_GRUPOS = (
+    '\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f \x85\xa0\U00001680'
+    '\U00002000\U00002001\U00002002\U00002003\U00002004\U00002005\U00002006\U00002007\U00002008\U00002009\U0000200a'
+    '\U00002028\U00002029\U0000202f\U0000205f\U00003000\U0000feff'
+)
 
 # ── Validación ────────────────────────────────────────────────────
 
@@ -202,7 +211,7 @@ def analizar_grupos(texto, total):
     if len(texto) > MAX_TEXTO_GRUPOS:
         raise ValueError('El texto de los grupos es demasiado largo.')
 
-    trozos = [t.strip() for t in texto.split(',')]
+    trozos = [t.strip(_ESPACIOS_GRUPOS) for t in texto.split(',')]
     trozos = [t for t in trozos if t]
     if not trozos:
         raise ValueError('Escribe al menos un grupo de páginas, por ejemplo 1-2,3-5,6.')

@@ -1,0 +1,59 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv/
+.venv_wsl/
+.venv_test/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project specific
+app/uploads/*
+app/database/logs.db*
+app/database/*.db
+*.log
+# Solo en la raíz: app/static/pdfjs/build/ es PDF.js y sí va al repositorio
+/dist/
+/build/
+*.egg-info/
+
+# Archivos sueltos que dejan las pruebas manuales del editor
+/test_editad*.pdf
+/test_editar*.pdf
+/test_editar_*.png
+
+# Docker
+.dockerignore
+
+# Node (if added in future)
+node_modules/
+npm-debug.log
+yarn-error.log

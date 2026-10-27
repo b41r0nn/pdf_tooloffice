@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF ToolOffice</title>
+  <link rel="stylesheet" href="../static/css/style.css">
+</head>
+<body>
+
+<!-- ── Header ───────────────────────────────────────────────── -->
+<header class="header">
+  <a class="logo" href="#">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/>
+        <line x1="16" y1="17" x2="8" y2="17"/>
+        <polyline points="10 9 9 9 8 9"/>
+      </svg>
+    </div>
+    <span class="logo-text">PDF <span>ToolOffice</span></span>
+  </a>
+
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-panel="union">Unión</button>
+    <button class="nav-tab" data-panel="division">División</button>
+    <button class="nav-tab" data-panel="conversion">Conversión</button>
+    <button class="nav-tab" data-panel="compresion">Compresión</button>
+    <button class="nav-tab" data-panel="cifrado">Cifrado</button>
+  </nav>
+
+  <span class="header-right">v2.0.0 · LOCAL</span>
+</header>
+
+<!-- ── Main ─────────────────────────────────────────────────── -->
+<main class="main">
+
+  <!-- ══ UNIÓN ══════════════════════════════════════════════ -->
+  <section id="panel-union" class="panel active">
+    <div class="panel-header">
+      <h1 class="panel-title">Unión de PDFs</h1>
+      <p class="panel-desc">Combina múltiples archivos PDF en uno solo. El orden de los archivos define el orden final.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Archivos a unir</div>
+      <div class="upload-zone">
+        <input type="file" accept=".pdf" multiple>
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <p class="upload-title">Arrastra los archivos aquí o haz clic</p>
+        <p class="upload-sub">Puedes seleccionar varios archivos a la vez</p>
+        <span class="upload-limit">máx. 50 MB por archivo</span>
+      </div>
+      <p style="font-size:12px;color:#8E9AB5;margin-top:12px">Arrastra los archivos de la lista para cambiar el orden antes de unir.</p>
+      <div class="file-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Nombre del archivo resultante</div>
+      <div class="form-group">
+        <input type="text" class="form-input" placeholder="documento_unido.pdf" value="documento_unido.pdf">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contraseña para PDFs protegidos (opcional)</label>
+        <input type="password" class="form-input" id="union-password" placeholder="Solo si alguno está cifrado">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Compresión del resultado (opcional)</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <input type="checkbox" id="union-comprimir" style="width:16px;height:16px;accent-color:#1B4FD8;cursor:pointer">
+        <label for="union-comprimir" style="font-size:13px;color:#4B5680;cursor:pointer">
+          Comprimir el PDF resultante al unir
+        </label>
+      </div>
+      <div id="union-nivel-wrap" style="display:none">
+        <div class="pill-group">
+          <div class="pill-option">
+            <input type="radio" name="union-nivel" id="un-baja" value="baja">
+            <label for="un-baja">Baja — mayor calidad</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="union-nivel" id="un-media" value="media" checked>
+            <label for="un-media">Media — equilibrado</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="union-nivel" id="un-alta" value="alta">
+            <label for="un-alta">Alta — menor tamaño</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="union-nivel" id="un-ultra" value="ultra">
+            <label for="un-ultra">Ultra — máxima compresión</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-primary btn-process">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Procesar
+      </button>
+      <span class="badge badge-gray">Orden: según lista</span>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Procesando...</span>
+        <span class="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="result-info">
+        <div class="result-name">documento_unido.pdf</div>
+        <div class="result-size">Listo · descarga automática</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ DIVISIÓN ═══════════════════════════════════════════ -->
+  <section id="panel-division" class="panel">
+    <div class="panel-header">
+      <h1 class="panel-title">División de PDF</h1>
+      <p class="panel-desc">Extrae páginas o rangos de un PDF. Puedes obtener páginas individuales o un rango continuo.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Archivo PDF</div>
+      <div class="upload-zone">
+        <input type="file" accept=".pdf">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <p class="upload-title">Arrastra el archivo aquí o haz clic</p>
+        <p class="upload-sub">Solo archivos PDF</p>
+        <span class="upload-limit">máx. 50 MB</span>
+      </div>
+      <div class="file-list"></div>
+
+      <div class="divider"></div>
+
+      <div class="card-label">Vista previa</div>
+      <div class="preview-box" style="display:none">
+        <div class="preview-thumb">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+        </div>
+        <div class="preview-info">
+          <div class="preview-name">archivo.pdf</div>
+          <div class="preview-pages">— páginas</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Modo de división</div>
+      <div class="pill-group" style="margin-bottom:16px">
+        <div class="pill-option">
+          <input type="radio" name="modo-div" id="div-rango" value="rango" checked>
+          <label for="div-rango">Por rango</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="modo-div" id="div-todas" value="todas">
+          <label for="div-todas">Todas las páginas</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="modo-div" id="div-pares" value="pares">
+          <label for="div-pares">Solo pares</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="modo-div" id="div-impares" value="impares">
+          <label for="div-impares">Solo impares</label>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Página inicio</label>
+          <input type="number" class="form-input" placeholder="1" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Página fin</label>
+          <input type="number" class="form-input" placeholder="5" min="1">
+        </div>
+      </div>
+      <p class="form-hint">Ejemplo: de la página 2 a la 8 extrae esas 7 páginas en un nuevo PDF.</p>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-primary btn-process">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Procesar
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Procesando...</span>
+        <span class="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="result-info">
+        <div class="result-name">fragmento.pdf</div>
+        <div class="result-size">Listo · descarga automática</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ CONVERSIÓN ═════════════════════════════════════════ -->
+  <section id="panel-conversion" class="panel">
+    <div class="panel-header">
+      <h1 class="panel-title">Conversión de archivos</h1>
+      <p class="panel-desc">Convierte entre PDF, Excel (.xlsx) y Word (.docx) en ambas direcciones.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Dirección de conversión</div>
+      <div class="pill-group" style="margin-bottom:0">
+        <div class="pill-option">
+          <input type="radio" name="conv-dir" id="cv-pdf-xlsx" value="pdf-xlsx" checked>
+          <label for="cv-pdf-xlsx">PDF → Excel</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="conv-dir" id="cv-pdf-docx" value="pdf-docx">
+          <label for="cv-pdf-docx">PDF → Word</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="conv-dir" id="cv-xlsx-pdf" value="xlsx-pdf">
+          <label for="cv-xlsx-pdf">Excel → PDF</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="conv-dir" id="cv-docx-pdf" value="docx-pdf">
+          <label for="cv-docx-pdf">Word → PDF</label>
+        </div>
+        <div style="width: 100%; height: 10px;"></div>
+        <div class="pill-option">
+          <input type="radio" name="conv-dir" id="cv-imagen-pdf" value="imagen_a_pdf">
+          <label for="cv-imagen-pdf">JPG/PNG/BMP/WEBP → PDF</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="conv-dir" id="cv-pdf-jpg" value="pdf_a_jpg">
+          <label for="cv-pdf-jpg">PDF → JPG</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Archivo a convertir</div>
+      <div class="upload-zone" id="conversion-upload-zone">
+        <input type="file" accept=".pdf,.xlsx,.docx" id="conversion-file-input">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <p class="upload-title">Arrastra el archivo aquí o haz clic</p>
+        <p class="upload-sub" id="conversion-upload-sub">PDF, Excel (.xlsx) o Word (.docx)</p>
+        <span class="upload-limit">máx. 50 MB</span>
+      </div>
+      <div class="file-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-primary btn-process">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Convertir
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Convirtiendo...</span>
+        <span class="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="result-info">
+        <div class="result-name">archivo_convertido.xlsx</div>
+        <div class="result-size">Listo · descarga automática</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ COMPRESIÓN ══════════════════════════════════════════ -->
+  <section id="panel-compresion" class="panel">
+    <div class="panel-header">
+      <h1 class="panel-title">Compresión de PDF</h1>
+      <p class="panel-desc">Reduce el tamaño del archivo manteniendo la mayor calidad posible.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Archivo PDF</div>
+      <div class="upload-zone">
+        <input type="file" accept=".pdf">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <p class="upload-title">Arrastra el archivo aquí o haz clic</p>
+        <p class="upload-sub">Solo archivos PDF</p>
+        <span class="upload-limit">máx. 50 MB</span>
+      </div>
+      <div class="file-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Nivel de compresión</div>
+      <div class="pill-group">
+        <div class="pill-option">
+          <input type="radio" name="comp-nivel" id="comp-baja" value="baja">
+          <label for="comp-baja">Baja — mayor calidad</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="comp-nivel" id="comp-media" value="media" checked>
+          <label for="comp-media">Media — equilibrado</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="comp-nivel" id="comp-alta" value="alta">
+          <label for="comp-alta">Alta — menor tamaño</label>
+        </div>
+        <div class="pill-option">
+          <input type="radio" name="comp-nivel" id="comp-ultra" value="ultra">
+          <label for="comp-ultra">Ultra ⭐ — máxima compresión</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-primary btn-process">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Comprimir
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Comprimiendo...</span>
+        <span class="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="result-info">
+        <div class="result-name">archivo_comprimido.pdf</div>
+        <div class="result-size">Listo · descarga automática</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ CIFRADO ═════════════════════════════════════════════ -->
+  <section id="panel-cifrado" class="panel">
+    <div class="panel-header">
+      <h1 class="panel-title">Cifrado con contraseña</h1>
+      <p class="panel-desc">Protege un PDF con contraseña. Solo quien la conozca podrá abrirlo.</p>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Archivo PDF</div>
+      <div class="upload-zone">
+        <input type="file" accept=".pdf">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="16 16 12 12 8 16"/>
+            <line x1="12" y1="12" x2="12" y2="21"/>
+            <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/>
+          </svg>
+        </div>
+        <p class="upload-title">Arrastra el archivo aquí o haz clic</p>
+        <p class="upload-sub">Solo archivos PDF</p>
+        <span class="upload-limit">máx. 50 MB</span>
+      </div>
+      <div class="file-list"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Contraseña</div>
+      <div class="form-group">
+        <label class="form-label">Nueva contraseña</label>
+        <div style="position:relative">
+          <input type="password" id="pass1" class="form-input" placeholder="Ingresa la contraseña" style="padding-right:40px">
+          <button type="button" onclick="togglePass('pass1',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#8E9AB5">
+            <svg id="eye-pass1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirmar contraseña</label>
+        <div style="position:relative">
+          <input type="password" id="pass2" class="form-input" placeholder="Repite la contraseña" style="padding-right:40px">
+          <button type="button" onclick="togglePass('pass2',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#8E9AB5">
+            <svg id="eye-pass2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <p class="form-hint">Guarda la contraseña en un lugar seguro. No es posible recuperarla.</p>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn-primary btn-process">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+        </svg>
+        Cifrar PDF
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Cifrando...</span>
+        <span class="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box">
+      <div class="result-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <div class="result-info">
+        <div class="result-name">archivo_cifrado.pdf</div>
+        <div class="result-size">Listo · descarga automática</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── Toast ─────────────────────────────────────────────── -->
+<div id="toast" class="toast"></div>
+
+<footer style="
+  text-align: center;
+  padding: 20px 16px;
+  margin-top: 40px;
+  border-top: 1px solid #C3D9FF;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  color: #8E9AB5;
+  background: #F5F7FC;
+">
+  <p style="margin:0 0 4px">
+    <strong style="color:#0F1E3D">PDF ToolOffice v2.0.0</strong>
+  </p>
+  <p style="margin:0 0 4px">
+    Desarrollado por <strong style="color:#1B4FD8">Bairon Nicolas Calle Rivera</strong>
+  </p>
+  <p style="margin:0 0 4px">
+    <a href="mailto:b41r0nn@gmail.com" style="color:#1B4FD8;text-decoration:none">b41r0nn@gmail.com</a>
+  </p>
+  <p style="margin:4px 0 0;font-size:11px;color:#B0BAD0">
+    © 2026 · Uso interno REDIHOSSAS · Licencia CC BY-NC 4.0 · Solo uso no comercial
+  </p>
+</footer>
+
+<script src="../static/js/main.js"></script>
+</body>
+</html>

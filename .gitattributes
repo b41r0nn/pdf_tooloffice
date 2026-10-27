@@ -1,0 +1,17 @@
+# Todo el texto va con finales de línea LF, también en Windows.
+# El proyecto se despliega en Linux dentro de Docker: con CRLF, el Dockerfile y los
+# scripts del contenedor dejan de funcionar.
+* text=auto eol=lf
+
+# Binarios: que Git no los toque nunca
+*.pdf    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.ico    binary
+*.woff2  binary
+*.wasm   binary
+*.xlsx   binary
+*.docx   binary
+*.bcmap  binary
+*.pfb    binary

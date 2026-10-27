@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDF ToolOffice</title>
+  <meta name="description" content="Unir, dividir, convertir, comprimir, proteger y editar PDF">
+  <meta name="theme-color" content="#0A1222">
+  <meta name="color-scheme" content="dark">
+  <!-- Favicons según "How to Favicon" (Evil Martians): ICO 32 px, SVG con modo oscuro, Apple 180 px y manifiesto -->
+  <link rel="icon" href="{{ url_for('static', filename='icons/favicon.ico') }}" sizes="32x32">
+  <link rel="icon" href="{{ url_for('static', filename='icons/icon.svg') }}" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='icons/manifest.webmanifest') }}">
+  <link rel="preload" href="{{ url_for('static', filename='fonts/bricolage-grotesque.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="{{ url_for('static', filename='fonts/atkinson-hyperlegible-next.woff2') }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body data-herramienta="union">
+
+<!-- ── Cabecera: cada herramienta es un separador de carpeta con su color ── -->
+<header class="header">
+  <a class="logo" href="/">
+    <img class="logo-marca" src="{{ url_for('static', filename='icons/icon.svg') }}" width="34" height="34" alt="">
+    <span class="logo-texto">PDF ToolOffice</span>
+  </a>
+
+  <nav class="nav-tabs" role="tablist" aria-label="Herramientas">
+    <button class="nav-tab active" id="tab-union" data-panel="union" role="tab" aria-selected="true" aria-controls="panel-union">Unir</button>
+    <button class="nav-tab" id="tab-division" data-panel="division" role="tab" aria-selected="false" aria-controls="panel-division" tabindex="-1">Dividir</button>
+    <button class="nav-tab" id="tab-conversion" data-panel="conversion" role="tab" aria-selected="false" aria-controls="panel-conversion" tabindex="-1">Convertir</button>
+    <button class="nav-tab" id="tab-compresion" data-panel="compresion" role="tab" aria-selected="false" aria-controls="panel-compresion" tabindex="-1">Comprimir</button>
+    <button class="nav-tab" id="tab-cifrado" data-panel="cifrado" role="tab" aria-selected="false" aria-controls="panel-cifrado" tabindex="-1">Proteger</button>
+    <button class="nav-tab" id="tab-editar" data-panel="editar" role="tab" aria-selected="false" aria-controls="panel-editar" tabindex="-1">Editar</button>
+  </nav>
+</header>
+
+<main class="main">
+
+  <!-- ══ UNIR ═══════════════════════════════════════════════ -->
+  <section id="panel-union" class="panel active" role="tabpanel" aria-labelledby="tab-union">
+    <header class="panel-header">
+      <h1 class="panel-title">Unir PDF</h1>
+      <p class="panel-desc">Junta varios PDF en un solo archivo. El resultado sigue el orden de la lista.</p>
+    </header>
+
+    <ol class="hoja pasos">
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige los PDF</h2>
+        <div class="upload-zone">
+          <input type="file" accept=".pdf" multiple aria-label="Elegir los PDF a unir">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
+          </span>
+          <p class="upload-title">Arrastra los archivos aquí o haz clic para buscarlos</p>
+          <p class="upload-sub">Puedes elegir varios a la vez. Hasta 50 MB cada uno.</p>
+        </div>
+        <div class="file-list"></div>
+        <p class="form-hint">Arrastra los archivos de la lista para cambiar el orden.</p>
+      </li>
+
+      <li class="card paso">
+        <h2 class="paso-titulo">Nombra el resultado</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="union-nombre">Nombre del archivo</label>
+            <input type="text" class="form-input" id="union-nombre" value="documento_unido.pdf" placeholder="documento_unido.pdf">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="union-password">Contraseña de los PDF protegidos</label>
+            <input type="password" class="form-input" id="union-password" placeholder="Solo si alguno la tiene" autocomplete="off">
+          </div>
+        </div>
+      </li>
+
+      <li class="card paso">
+        <h2 class="paso-titulo">Reduce el tamaño <span class="opcional">opcional</span></h2>
+        <label class="check" for="union-comprimir">
+          <input type="checkbox" id="union-comprimir"> Comprimir el PDF unido
+        </label>
+        <div id="union-nivel-wrap" class="niveles" role="radiogroup" aria-label="Nivel de compresión" hidden>
+          <div class="pill-option nivel">
+            <input type="radio" name="union-nivel" id="un-baja" value="baja">
+            <label for="un-baja"><strong>Baja</strong><span>Mejor calidad</span></label>
+          </div>
+          <div class="pill-option nivel">
+            <input type="radio" name="union-nivel" id="un-media" value="media" checked>
+            <label for="un-media"><strong>Media</strong><span>Equilibrio entre tamaño y calidad</span></label>
+          </div>
+          <div class="pill-option nivel">
+            <input type="radio" name="union-nivel" id="un-alta" value="alta">
+            <label for="un-alta"><strong>Alta</strong><span>Archivo más liviano</span></label>
+          </div>
+          <div class="pill-option nivel">
+            <input type="radio" name="union-nivel" id="un-ultra" value="ultra">
+            <label for="un-ultra"><strong>Ultra</strong><span>Escala de grises; el texto deja de ser seleccionable</span></label>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="action-bar">
+      <button type="button" class="btn-primary btn-process">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="2" width="12" height="15" rx="2"/><path d="M16 21H6a2 2 0 0 1-2-2V7"/></svg>
+        Unir PDF
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Uniendo…</span><span class="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box" role="status">
+      <span class="result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+      <div class="result-info">
+        <div class="result-name">documento_unido.pdf</div>
+        <div class="result-size">Se descargó automáticamente</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar de nuevo
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ DIVIDIR ════════════════════════════════════════════ -->
+  <section id="panel-division" class="panel" role="tabpanel" aria-labelledby="tab-division">
+    <header class="panel-header">
+      <h1 class="panel-title">Dividir PDF</h1>
+      <p class="panel-desc">Saca un rango de páginas, solo las pares o impares, o cada página en su propio archivo.</p>
+    </header>
+
+    <ol class="hoja pasos">
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige el PDF</h2>
+        <div class="upload-zone">
+          <input type="file" accept=".pdf" aria-label="Elegir el PDF a dividir">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
+          </span>
+          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
+          <p class="upload-sub">Un PDF de hasta 50 MB</p>
+        </div>
+        <div class="file-list"></div>
+        <div class="preview-box" hidden>
+          <span class="preview-thumb" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          </span>
+          <div class="preview-info">
+            <div class="preview-name">archivo.pdf</div>
+            <div class="preview-pages">Detectando páginas…</div>
+          </div>
+        </div>
+      </li>
+
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige qué páginas sacar</h2>
+        <div class="pill-group" role="radiogroup" aria-label="Modo de división">
+          <div class="pill-option">
+            <input type="radio" name="modo-div" id="div-rango" value="rango" checked>
+            <label for="div-rango">Un rango</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="modo-div" id="div-todas" value="todas">
+            <label for="div-todas">Cada página por separado (ZIP)</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="modo-div" id="div-pares" value="pares">
+            <label for="div-pares">Solo las pares</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="modo-div" id="div-impares" value="impares">
+            <label for="div-impares">Solo las impares</label>
+          </div>
+        </div>
+
+        <div id="div-rango-campos">
+          <div class="form-row form-row-corta">
+            <div class="form-group">
+              <label class="form-label" for="div-inicio">Desde la página</label>
+              <input type="number" class="form-input" id="div-inicio" placeholder="1" min="1" inputmode="numeric">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="div-fin">Hasta la página</label>
+              <input type="number" class="form-input" id="div-fin" placeholder="5" min="1" inputmode="numeric">
+            </div>
+          </div>
+          <p class="form-hint">Por ejemplo, de la 2 a la 8 crea un PDF con esas 7 páginas.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="action-bar">
+      <button type="button" class="btn-primary btn-process">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>
+        Dividir PDF
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Dividiendo…</span><span class="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box" role="status">
+      <span class="result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+      <div class="result-info">
+        <div class="result-name">fragmento.pdf</div>
+        <div class="result-size">Se descargó automáticamente</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar de nuevo
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ CONVERTIR ══════════════════════════════════════════ -->
+  <section id="panel-conversion" class="panel" role="tabpanel" aria-labelledby="tab-conversion">
+    <header class="panel-header">
+      <h1 class="panel-title">Convertir archivos</h1>
+      <p class="panel-desc">PDF a Excel deja cada tabla en su propia hoja, con números y fechas que se pueden sumar, y aparte los datos sueltos como NIT, fechas y totales. Los PDF escaneados se leen con reconocimiento de texto.</p>
+    </header>
+
+    <ol class="hoja pasos">
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige la conversión</h2>
+        <div class="pill-group conversiones" role="radiogroup" aria-label="Tipo de conversión">
+          <div class="pill-option">
+            <input type="radio" name="conv-dir" id="cv-pdf-xlsx" value="pdf-xlsx" checked>
+            <label for="cv-pdf-xlsx">PDF → Excel</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="conv-dir" id="cv-pdf-docx" value="pdf-docx">
+            <label for="cv-pdf-docx">PDF → Word</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="conv-dir" id="cv-pdf-jpg" value="pdf_a_jpg">
+            <label for="cv-pdf-jpg">PDF → JPG</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="conv-dir" id="cv-xlsx-pdf" value="xlsx-pdf">
+            <label for="cv-xlsx-pdf">Excel → PDF</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="conv-dir" id="cv-docx-pdf" value="docx-pdf">
+            <label for="cv-docx-pdf">Word → PDF</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="conv-dir" id="cv-imagen-pdf" value="imagen_a_pdf">
+            <label for="cv-imagen-pdf">Imágenes → PDF</label>
+          </div>
+        </div>
+      </li>
+
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige el archivo</h2>
+        <div class="upload-zone" id="conversion-upload-zone">
+          <input type="file" accept=".pdf,.xlsx,.docx" id="conversion-file-input" aria-label="Elegir el archivo a convertir">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
+          </span>
+          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
+          <p class="upload-sub"><span id="conversion-upload-sub">PDF, Excel (.xlsx) o Word (.docx)</span>. Hasta 50 MB.</p>
+        </div>
+        <div class="file-list"></div>
+      </li>
+    </ol>
+
+    <div class="action-bar">
+      <button type="button" class="btn-primary btn-process">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        Convertir
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Convirtiendo…</span><span class="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box" role="status">
+      <span class="result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+      <div class="result-info">
+        <div class="result-name">archivo_convertido.xlsx</div>
+        <div class="result-size">Se descargó automáticamente</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar de nuevo
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ COMPRIMIR ══════════════════════════════════════════ -->
+  <section id="panel-compresion" class="panel" role="tabpanel" aria-labelledby="tab-compresion">
+    <header class="panel-header">
+      <h1 class="panel-title">Comprimir PDF</h1>
+      <p class="panel-desc">Reduce el peso del archivo para enviarlo por correo o subirlo a un portal.</p>
+    </header>
+
+    <ol class="hoja pasos">
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige el PDF</h2>
+        <div class="upload-zone">
+          <input type="file" accept=".pdf" aria-label="Elegir el PDF a comprimir">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
+          </span>
+          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
+          <p class="upload-sub">Un PDF de hasta 50 MB</p>
+        </div>
+        <div class="file-list"></div>
+      </li>
+
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige cuánto reducir</h2>
+        <div class="niveles" role="radiogroup" aria-label="Nivel de compresión">
+          <div class="pill-option nivel">
+            <input type="radio" name="comp-nivel" id="comp-baja" value="baja">
+            <label for="comp-baja"><strong>Baja</strong><span>Mejor calidad</span></label>
+          </div>
+          <div class="pill-option nivel">
+            <input type="radio" name="comp-nivel" id="comp-media" value="media" checked>
+            <label for="comp-media"><strong>Media</strong><span>Equilibrio entre tamaño y calidad</span></label>
+          </div>
+          <div class="pill-option nivel">
+            <input type="radio" name="comp-nivel" id="comp-alta" value="alta">
+            <label for="comp-alta"><strong>Alta</strong><span>Archivo más liviano</span></label>
+          </div>
+          <div class="pill-option nivel">
+            <input type="radio" name="comp-nivel" id="comp-ultra" value="ultra">
+            <label for="comp-ultra"><strong>Ultra</strong><span>Escala de grises; el texto deja de ser seleccionable</span></label>
+          </div>
+        </div>
+      </li>
+    </ol>
+
+    <div class="action-bar">
+      <button type="button" class="btn-primary btn-process">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        Comprimir PDF
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Comprimiendo…</span><span class="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box" role="status">
+      <span class="result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+      <div class="result-info">
+        <div class="result-name">archivo_comprimido.pdf</div>
+        <div class="result-size">Se descargó automáticamente</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar de nuevo
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ PROTEGER ═══════════════════════════════════════════ -->
+  <section id="panel-cifrado" class="panel" role="tabpanel" aria-labelledby="tab-cifrado">
+    <header class="panel-header">
+      <h1 class="panel-title">Proteger con contraseña</h1>
+      <p class="panel-desc">Cifra el PDF: solo quien tenga la contraseña podrá abrirlo.</p>
+    </header>
+
+    <ol class="hoja pasos">
+      <li class="card paso">
+        <h2 class="paso-titulo">Elige el PDF</h2>
+        <div class="upload-zone">
+          <input type="file" accept=".pdf" aria-label="Elegir el PDF a proteger">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
+          </span>
+          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
+          <p class="upload-sub">Un PDF de hasta 50 MB</p>
+        </div>
+        <div class="file-list"></div>
+      </li>
+
+      <li class="card paso">
+        <h2 class="paso-titulo">Escribe la contraseña</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="pass1">Contraseña</label>
+            <div class="campo-clave">
+              <input type="password" id="pass1" class="form-input" placeholder="Nueva contraseña" autocomplete="new-password">
+              <button type="button" class="btn-ojo" onclick="togglePass('pass1',this)" aria-label="Mostrar contraseña" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pass2">Repite la contraseña</label>
+            <div class="campo-clave">
+              <input type="password" id="pass2" class="form-input" placeholder="La misma contraseña" autocomplete="new-password">
+              <button type="button" class="btn-ojo" onclick="togglePass('pass2',this)" aria-label="Mostrar contraseña" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        <p class="form-hint">Guárdala en un lugar seguro: si se pierde, el PDF no se puede abrir.</p>
+      </li>
+    </ol>
+
+    <div class="action-bar">
+      <button type="button" class="btn-primary btn-process">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Proteger PDF
+      </button>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Cifrando…</span><span class="progress-pct">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill"></div></div>
+    </div>
+
+    <div class="result-box" role="status">
+      <span class="result-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+      <div class="result-info">
+        <div class="result-name">archivo_cifrado.pdf</div>
+        <div class="result-size">Se descargó automáticamente</div>
+      </div>
+      <a class="btn-download" href="#">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Descargar de nuevo
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ EDITAR ═════════════════════════════════════════════ -->
+  <section id="panel-editar" class="panel" role="tabpanel" aria-labelledby="tab-editar">
+    <header class="panel-header">
+      <h1 class="panel-title">Editar PDF</h1>
+      <p class="panel-desc">Escribe o firma sobre el documento, inserta imágenes, rellena formularios, organiza páginas o corrige el texto que ya tiene.</p>
+    </header>
+
+    <div class="hoja" id="ed-carga">
+      <div class="card">
+        <div class="editor-upload-zone" id="ed-zona">
+          <input type="file" id="ed-input" accept=".pdf,application/pdf" aria-label="Elegir el PDF a editar">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          </span>
+          <p class="upload-title">Arrastra el PDF aquí o haz clic para buscarlo</p>
+          <p class="upload-sub">Hasta 50 MB. Cada cambio se guarda como versión y se puede deshacer.</p>
+        </div>
+        <div class="form-group form-group-final">
+          <label class="form-label" for="ed-contrasena">Contraseña del PDF</label>
+          <input type="password" class="form-input" id="ed-contrasena" autocomplete="off" placeholder="Solo si está protegido">
+        </div>
+      </div>
+    </div>
+
+    <div id="ed-espacio" hidden>
+      <div class="ed-barra">
+        <div class="ed-doc">
+          <strong id="ed-nombre"></strong>
+          <span id="ed-estado" class="badge badge-gray"></span>
+        </div>
+        <div class="ed-modos" role="tablist" aria-label="Modo de edición">
+          <button type="button" class="ed-modo active" data-modo="anotar" role="tab" aria-selected="true">Anotar, firmar y páginas</button>
+          <button type="button" class="ed-modo" data-modo="texto" role="tab" aria-selected="false">Corregir texto</button>
+        </div>
+        <div class="ed-acciones">
+          <button type="button" class="btn-secondary" id="ed-guardar">Guardar cambios</button>
+          <button type="button" class="btn-secondary" id="ed-deshacer">Deshacer</button>
+          <label class="check ed-check" title="Fija textos, firmas, dibujos y formularios para que no se puedan mover ni borrar">
+            <input type="checkbox" id="ed-aplanar" checked> Aplanar
+          </label>
+          <button type="button" class="btn-primary" id="ed-descargar">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Descargar
+          </button>
+          <button type="button" class="btn-secondary" id="ed-cerrar">Cerrar</button>
+        </div>
+      </div>
+
+      <div id="ed-vista-anotar">
+        <p class="ed-ayuda">
+          Las herramientas están en la barra superior del visor: <strong>texto</strong>, <strong>dibujar</strong>,
+          <strong>firma</strong>, <strong>imagen</strong>, <strong>resaltar</strong> y <strong>comentarios</strong>.
+          Los formularios se rellenan haciendo clic en los campos. Para borrar, mover o copiar páginas abre
+          el panel lateral de páginas. Pulsa <strong>Guardar cambios</strong> antes de cambiar de modo; al descargar se guarda solo.
+        </p>
+        <iframe id="ed-visor" class="ed-visor" title="Visor y editor PDF"
+                data-src="{{ url_for('static', filename='pdfjs/web/viewer.html') }}"
+                data-css="{{ url_for('static', filename='css/visor.css') }}"></iframe>
+      </div>
+
+      <div id="ed-vista-texto" hidden>
+        <div class="ed-texto-barra">
+          <div class="ed-paginador">
+            <button type="button" class="btn-secondary btn-icono" id="ed-prev" aria-label="Página anterior">‹</button>
+            <label for="ed-pagina">Página</label>
+            <input type="number" id="ed-pagina" class="form-input" min="1" value="1">
+            <span>de <span id="ed-total">1</span></span>
+            <button type="button" class="btn-secondary btn-icono" id="ed-next" aria-label="Página siguiente">›</button>
+          </div>
+          <label class="ed-alineacion">Al reemplazar
+            <select id="ed-alineacion" class="form-input">
+              <option value="izquierda">mantener el inicio</option>
+              <option value="derecha">mantener el final (cifras)</option>
+              <option value="centro">centrar</option>
+            </select>
+          </label>
+          <span id="ed-campos-count" class="badge badge-blue"></span>
+        </div>
+        <p class="ed-ayuda">
+          Haz clic en un texto resaltado, escribe y pulsa <strong>Enter</strong> (<strong>Esc</strong> cancela).
+          Se conservan la fuente, el tamaño y el color. Para borrar un texto deja el campo vacío y pulsa Enter.
+        </p>
+        <div id="ed-aviso" class="ed-aviso" hidden></div>
+        <div id="ed-escenario-wrap">
+          <div id="ed-escenario">
+            <img id="ed-img" alt="Página del PDF">
+            <div id="ed-overlays"></div>
+          </div>
+          <div id="ed-cargando" class="editor-loading" hidden>
+            <div class="editor-spinner"></div>
+            <span>Procesando…</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<footer class="pie">
+  <p class="pie-nombre">PDF ToolOffice v{{ version }}</p>
+  <p>Desarrollado por <strong>Bairon Nicolas Calle Rivera</strong>, <a href="mailto:b41r0nn@gmail.com">b41r0nn@gmail.com</a></p>
+  <p class="pie-legal">© 2026, uso interno de REDIHOS S.A.S. Licencia CC BY-NC 4.0: solo uso no comercial.</p>
+</footer>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+</body>
+</html>

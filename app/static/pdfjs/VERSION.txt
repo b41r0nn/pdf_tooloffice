@@ -1,0 +1,1 @@
+PDF.js v6.4.299 (legacy build) — https://github.com/mozilla/pdf.js/releases/tag/v6.4.299 — Apache-2.0. Recortado: sin source maps, sin PDF de ejemplo, locales es-*/en-US.

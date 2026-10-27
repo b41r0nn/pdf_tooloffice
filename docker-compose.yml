@@ -1,0 +1,23 @@
+# Uso: desde la carpeta pdf_tooloffice ->  docker compose up -d --build
+#
+# name fija el proyecto como "app" para seguir administrando el mismo
+# contenedor app-web-1 (antes el compose vivía en app/ y el nombre del
+# proyecto salía de esa carpeta). Sin esto se crearía un segundo contenedor
+# que chocaría en el puerto 5000.
+name: app
+
+services:
+  web:
+    build: ./app
+    ports:
+      # Ojo: en el servidor 192.168.1.250 el puerto 5000 ya lo usa kyocera-web.
+      - "5000:5000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./app/uploads:/srv/app/uploads
+      - ./app/database:/srv/app/database
+    restart: unless-stopped

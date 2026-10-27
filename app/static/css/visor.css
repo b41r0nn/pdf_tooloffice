@@ -1,0 +1,49 @@
+/* Ajustes al visor PDF.js del editor. editor.js lo enlaza dentro del iframe: la CSP de
+   viewer.html (style-src 'self') bloquea los <style> en línea, no las hojas del mismo origen. */
+
+/* Abrir otro archivo desde el visor rompería la sesión; descargar lo hace la barra propia. */
+#secondaryOpenFile,
+#openFile,
+#downloadButton,
+#secondaryDownload,
+#viewBookmark {
+  display: none !important;
+}
+
+/* PDF.js fija 350 px de ancho mínimo: en un celular el visor queda más ancho que el
+   recuadro y se recortan la página y los últimos botones. */
+#mainContainer { min-width: 0; }
+
+/* PDF.js oculta el selector de zoom hasta 560 px; entre 560 y 600 tampoco cabe y empuja
+   fuera el menú »: quedan los botones + y −. */
+@media (max-width: 600px) {
+  #scaleSelectContainer { display: none; }
+}
+
+/* En celulares la barra no cabe en una fila: las herramientas de edición pasan a la segunda. */
+@media (max-width: 520px) {
+  #toolbarContainer {
+    height: calc(2 * var(--toolbar-height));
+
+    #toolbarViewer {
+      flex-wrap: wrap;
+      align-content: space-between;
+
+      /* Cada grupo mide el alto de la barra (100%): con dos filas, la mitad */
+      > .toolbarHorizontalGroup { height: 50%; }
+    }
+
+    #toolbarViewerRight {
+      flex-basis: 100%;
+      justify-content: space-between;
+    }
+
+    #loadingBar { top: calc(2 * var(--toolbar-height)); }
+  }
+
+  #viewerContainer { inset-block-start: calc(2 * var(--toolbar-height)); }
+}
+
+/* La búsqueda y el diálogo de firma también traen anchos mínimos mayores que un celular */
+#findbar { min-width: 0; max-width: calc(100vw - 48px); }
+.signatureDialog { min-width: 0; max-width: calc(100vw - 16px); }

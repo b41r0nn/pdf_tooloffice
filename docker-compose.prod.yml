@@ -1,0 +1,33 @@
+# Producción en el servidor 192.168.1.250 (~/pdf_tooloffice):
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Misma política que kyocera-web: usuario app (uid 1000 = sistemas), nombre de
+# contenedor fijo, reinicio unless-stopped y puerto publicado sobre la IP de la
+# LAN (el servidor tiene net.ipv4.ip_nonlocal_bind=1, así que no falla si la red
+# sube tarde tras un corte de luz). Los logs ya están limitados en daemon.json.
+name: pdf_tooloffice
+
+services:
+  web:
+    build: ./app
+    image: pdf_tooloffice:latest
+    container_name: pdf_tooloffice
+    restart: unless-stopped
+    ports:
+      - "192.168.1.250:3000:5000"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WEB_CONCURRENCY=2          # servidor con 3,7 GB de RAM compartidos
+    volumes:
+      - ./app/uploads:/srv/app/uploads
+      - ./app/database:/srv/app/database
+    # Un PDF enorme no debe poder tumbar los demás servicios del servidor
+    mem_limit: 1536m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=5)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

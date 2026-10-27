@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>@media (prefers-color-scheme: dark) { .fondo { stroke: #4A5D86; stroke-width: 2; } }</style>
+  <rect class="fondo" width="32" height="32" rx="7" fill="#101A2E"/>
+  <g transform="translate(-.5 0)">
+    <rect x="20.5" y="11" width="6.5" height="4.2" rx="1.3" fill="#6CB6FF"/>
+    <rect x="20.5" y="16.4" width="6.5" height="4.2" rx="1.3" fill="#FFE066"/>
+    <rect x="20.5" y="21.8" width="6.5" height="4.2" rx="1.3" fill="#FF8FAB"/>
+    <path d="M7.6 4.5h9.6l5.3 5.3v16.6a1.6 1.6 0 0 1-1.6 1.6H7.6A1.6 1.6 0 0 1 6 26.4V6.1a1.6 1.6 0 0 1 1.6-1.6z" fill="#EEF3FB"/>
+    <path d="M17.2 4.5v3.7a1.6 1.6 0 0 0 1.6 1.6h3.7z" fill="#AFC0DB"/>
+    <rect x="9" y="12.2" width="9.6" height="2.4" rx="1.2" fill="#101A2E"/>
+    <rect x="9" y="16.9" width="9.6" height="2.4" rx="1.2" fill="#101A2E"/>
+    <rect x="9" y="21.6" width="6" height="2.4" rx="1.2" fill="#101A2E"/>
+  </g>
+</svg>

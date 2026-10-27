@@ -1,0 +1,15 @@
+{
+  "name": "PDF ToolOffice",
+  "short_name": "PDF ToolOffice",
+  "description": "Unir, dividir, convertir, comprimir, proteger y editar PDF",
+  "lang": "es",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F192D",
+  "theme_color": "#0A1222",
+  "icons": [
+    { "src": "icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "icon-mask.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" },
+    { "src": "icon-512.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}

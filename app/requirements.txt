@@ -1,0 +1,12 @@
+flask>=3.0,<4
+gunicorn>=21.0
+pymupdf>=1.24.14,<2
+pdf2docx>=0.5.8
+python-docx>=1.1
+openpyxl>=3.1
+# PDF → Excel: tablas sin bordes y escaneadas (trae opencv-python-headless y pandas)
+camelot-py>=2.0,<3
+reportlab>=4.0
+werkzeug>=3.0
+Pillow>=10.0
+python-dotenv>=1.0

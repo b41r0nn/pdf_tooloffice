@@ -1,0 +1,12 @@
+Tipografías de la interfaz de PDF ToolOffice (subconjunto latino, WOFF2, descargado de Google Fonts)
+
+bricolage-grotesque.woff2
+  Bricolage Grotesque — Copyright 2022 The Bricolage Grotesque Project Authors
+  https://github.com/ateliertriay/bricolage
+
+atkinson-hyperlegible-next.woff2
+  Atkinson Hyperlegible Next — Copyright 2020 Braille Institute of America, Inc.
+  https://www.brailleinstitute.org/freefont/
+
+Ambas se distribuyen bajo la SIL Open Font License, versión 1.1:
+https://openfontlicense.org/open-font-license-official-text/

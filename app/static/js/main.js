@@ -48,12 +48,88 @@ document.getElementById('union-comprimir')?.addEventListener('change', function(
   if (wrap) wrap.hidden = !this.checked;
 });
 
-// Los campos de inicio y fin solo aplican a la división por rango
+// Cada modo de división muestra sus propios campos y oculta los de los otros
 document.querySelectorAll('input[name="modo-div"]').forEach(radio => {
   radio.addEventListener('change', () => {
-    const campos = document.getElementById('div-rango-campos');
-    if (campos) campos.hidden = radio.value !== 'rango';
+    const camposPorModo = {
+      rango: 'div-rango-campos',
+      cada: 'div-cada-campos',
+      personalizado: 'div-grupos-campos',
+    };
+    Object.entries(camposPorModo).forEach(([modo, id]) => {
+      const campos = document.getElementById(id);
+      if (campos) campos.hidden = radio.value !== modo;
+    });
   });
+});
+
+// ── División: recuento en vivo de los archivos que saldrán ─────────
+// Total de páginas del PDF elegido en Dividir (null mientras no se sepa).
+window._totalPaginasDivision = null;
+// Por qué no se sabe: lo que respondió /api/paginas (un PDF cifrado, uno dañado…).
+// Sin esto la pantalla callaba y, al pedir las páginas, decía "sube primero el PDF"
+// de un archivo que ya estaba subido.
+window._motivoSinTotalDivision = null;
+let _archivoDivisionActual = null;
+
+function textoRecuentoDivision(resultado, paginasUltimo) {
+  if (resultado.error) return resultado.error;
+  const cantidad = resultado.grupos.length;
+  let texto = cantidad === 1 ? 'Saldrá 1 archivo.' : `Saldrán ${cantidad} archivos.`;
+  if (paginasUltimo) {
+    texto += ` El último archivo tendrá ${paginasUltimo === 1 ? '1 página' : paginasUltimo + ' páginas'}.`;
+  }
+  return texto;
+}
+
+function actualizarRecuentoDivision() {
+  const total = window._totalPaginasDivision;
+  // Sin total, en lugar de quedarse en blanco se dice por qué no se pudo leer el PDF.
+  const motivo = window._motivoSinTotalDivision || '';
+  const cuentaCada = document.getElementById('div-cuenta');
+  const cuentaGrupos = document.getElementById('div-grupos-cuenta');
+
+  if (cuentaCada) {
+    const porArchivo = Number(document.getElementById('div-paginas-por-archivo').value);
+    if (!total) {
+      cuentaCada.textContent = motivo;
+    } else {
+      const resultado = gruposPorBloques(total, porArchivo);
+      const grupos = resultado.grupos || [];
+      const ultimo = grupos.length ? total - (grupos.length - 1) * porArchivo : 0;
+      // Con un solo archivo, "el último archivo tendrá N páginas" no añade nada.
+      const corto = grupos.length > 1 && ultimo < porArchivo ? ultimo : 0;
+      cuentaCada.textContent = textoRecuentoDivision(resultado, corto);
+    }
+  }
+
+  if (cuentaGrupos) {
+    const texto = document.getElementById('div-grupos').value;
+    if (!total) cuentaGrupos.textContent = motivo;
+    else cuentaGrupos.textContent = texto.trim() ? textoRecuentoDivision(analizarGrupos(texto, total), 0) : '';
+  }
+}
+
+function olvidarTotalDivision() {
+  _archivoDivisionActual = null;
+  window._totalPaginasDivision = null;
+  window._motivoSinTotalDivision = null;
+  actualizarRecuentoDivision();
+}
+
+document.getElementById('div-paginas-por-archivo')?.addEventListener('input', actualizarRecuentoDivision);
+document.getElementById('div-grupos')?.addEventListener('input', actualizarRecuentoDivision);
+
+document.getElementById('div-rellenar')?.addEventListener('click', () => {
+  const total = window._totalPaginasDivision;
+  if (!total) {
+    showToast(window._motivoSinTotalDivision || 'Sube primero el PDF para saber cuántas páginas tiene');
+    return;
+  }
+  const resultado = gruposPorBloques(total, Number(document.getElementById('div-rellenar-n').value));
+  if (resultado.error) { showToast(resultado.error); return; }
+  document.getElementById('div-grupos').value = formatearGrupos(resultado.grupos);
+  actualizarRecuentoDivision();
 });
 
 // ── Upload zones ──────────────────────────────────────────────────
@@ -74,9 +150,18 @@ function handleFiles(zone, files) {
   if (!listEl) return;
   // En las herramientas de un solo archivo, el nuevo reemplaza al anterior
   const input = zone.querySelector('input[type="file"]');
-  if (input && !input.multiple && files.length) listEl.innerHTML = '';
+  if (input && !input.multiple && files.length) {
+    listEl.innerHTML = '';
+    // Si el que se va era el PDF de Dividir, el recuento no puede seguir
+    // describiéndolo: el reemplazo puede ser rechazado (p. ej. por tamaño).
+    if (listEl.closest('#panel-division')) olvidarTotalDivision();
+  }
   Array.from(files).forEach(file => {
-    if (file.size > MAX_BYTES) { showToast(`"${file.name}" supera el límite de ${MAX_MB} MB`); return; }
+    if (file.size > MAX_BYTES) {
+      // Sin la salida, quien escanea una tanda grande se queda sin siguiente paso.
+      showToast(`"${file.name}" supera el límite de ${MAX_MB} MB. Reduce su tamaño en la pestaña Comprimir.`);
+      return;
+    }
     addFileItem(listEl, file);
     updatePreview(zone, file);
   });
@@ -107,7 +192,10 @@ function addFileItem(listEl, file) {
     </button>`;
   item.querySelector('.file-name').textContent = file.name;
   item.querySelector('.file-size').textContent = formatSize(file.size);
-  item.querySelector('.file-remove').addEventListener('click', () => item.remove());
+  item.querySelector('.file-remove').addEventListener('click', () => {
+    item.remove();
+    if (listEl.closest('#panel-division')) olvidarTotalDivision();
+  });
 
   // Drag to reorder
   item.addEventListener('dragstart', e => {
@@ -147,13 +235,32 @@ function updatePreview(zone, file) {
   if (pagesEl) pagesEl.textContent = 'Detectando páginas…';
   previewBox.hidden = false;
 
+  const esDivision = !!zone.closest('#panel-division');
+  if (esDivision) {
+    olvidarTotalDivision();
+    _archivoDivisionActual = file;
+  }
+
   if (file.name.toLowerCase().endsWith('.pdf')) {
     const fd = new FormData();
     fd.append('archivo', file);
     fetch('/api/paginas', { method: 'POST', body: fd })
       .then(r => r.json())
-      .then(d => { if (pagesEl) pagesEl.textContent = d.paginas ? `${d.paginas} páginas` : 'N/D'; })
-      .catch(() => { if (pagesEl) pagesEl.textContent = 'N/D'; });
+      .then(d => {
+        if (pagesEl) pagesEl.textContent = d.paginas ? `${d.paginas} páginas` : 'N/D';
+        if (esDivision && _archivoDivisionActual === file) {
+          window._totalPaginasDivision = d.paginas || null;
+          window._motivoSinTotalDivision = d.paginas ? null : (d.error || null);
+          actualizarRecuentoDivision();
+        }
+      })
+      .catch(() => {
+        if (pagesEl) pagesEl.textContent = 'N/D';
+        if (esDivision && _archivoDivisionActual === file) {
+          window._motivoSinTotalDivision = 'No se pudo leer el PDF para saber cuántas páginas tiene';
+          actualizarRecuentoDivision();
+        }
+      });
   } else {
     if (pagesEl) pagesEl.textContent = formatSize(file.size);
   }
@@ -289,6 +396,34 @@ document.querySelector('#panel-division .btn-process')?.addEventListener('click'
       fd.append('modo',    'rango');
       fd.append('inicio', inicio);
       fd.append('fin', fin);
+      return fd;
+    });
+  } else if (modo === 'cada') {
+    const porArchivo = Number(document.getElementById('div-paginas-por-archivo')?.value);
+    const total = window._totalPaginasDivision;
+    if (total) {
+      const { error } = gruposPorBloques(total, porArchivo);
+      if (error) { showToast(error); return; }
+    }
+    procesarConFetch(panel, '/api/division', () => {
+      const fd = new FormData();
+      fd.append('archivo', items[0]._fileObj);
+      fd.append('modo',    'cada');
+      fd.append('paginas_por_archivo', String(porArchivo));
+      return fd;
+    });
+  } else if (modo === 'personalizado') {
+    const grupos = document.getElementById('div-grupos')?.value || '';
+    const total = window._totalPaginasDivision;
+    if (total) {
+      const { error } = analizarGrupos(grupos, total);
+      if (error) { showToast(error); return; }
+    }
+    procesarConFetch(panel, '/api/division', () => {
+      const fd = new FormData();
+      fd.append('archivo', items[0]._fileObj);
+      fd.append('modo',    'personalizado');
+      fd.append('grupos',  grupos);
       return fd;
     });
   } else {

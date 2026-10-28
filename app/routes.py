@@ -22,6 +22,7 @@ from . import __version__
 from .database import exportar_logs_excel, obtener_logs, registrar_log
 from .services import (
     NIVELES_COMPRESION,
+    analizar_grupos,
     cifrar_pdf,
     comprimir_pdf,
     contar_paginas,
@@ -29,7 +30,9 @@ from .services import (
     convertir_pdf_a_jpg,
     dividir_pdf,
     dividir_pdf_por_modo,
+    dividir_por_grupos,
     docx_a_pdf,
+    grupos_por_bloques,
     pdf_a_docx,
     pdf_a_xlsx,
     unir_pdfs,
@@ -82,7 +85,15 @@ def entero(nombre, defecto, minimo=None, maximo=None):
     except (TypeError, ValueError):
         raise ValueError(f'El parámetro "{nombre}" debe ser un número entero')
     if (minimo is not None and numero < minimo) or (maximo is not None and numero > maximo):
-        raise ValueError(f'El parámetro "{nombre}" debe estar entre {minimo} y {maximo}')
+        # La frase se arma con los límites que REALMENTE existen: con solo `minimo`
+        # el texto de antes decía "debe estar entre 1 y None", que no se puede leer.
+        if minimo is not None and maximo is not None:
+            limite = f'estar entre {minimo} y {maximo}'
+        elif minimo is not None:
+            limite = f'ser {minimo} o más'
+        else:
+            limite = f'ser {maximo} o menos'
+        raise ValueError(f'El parámetro "{nombre}" debe {limite}')
     return numero
 
 
@@ -283,6 +294,20 @@ def division():
             nombre_salida = f'{base}_paginas_{inicio}_a_{fin}.pdf'
             mimetype = MIMETYPES['pdf']
             detalle = f'modo=rango; paginas {inicio}-{fin}'
+        elif modo == 'cada':
+            paginas_por_archivo = entero('paginas_por_archivo', None, minimo=1)
+            if paginas_por_archivo is None:
+                raise ValueError('Indica cuántas páginas va a tener cada archivo')
+            grupos = grupos_por_bloques(contar_paginas(ruta), paginas_por_archivo)
+            resultado = dividir_por_grupos(ruta, grupos, base)
+            nombre_salida, mimetype = f'{base}_dividido.zip', 'application/zip'
+            detalle = f'modo=cada; paginas_por_archivo={paginas_por_archivo}; archivos={len(grupos)}'
+        elif modo == 'personalizado':
+            total = contar_paginas(ruta)
+            grupos = analizar_grupos(request.form.get('grupos', ''), total)
+            resultado = dividir_por_grupos(ruta, grupos, base)
+            nombre_salida, mimetype = f'{base}_dividido.zip', 'application/zip'
+            detalle = f'modo=personalizado; grupos={len(grupos)}; paginas={total}'
         else:
             resultado, tipo = dividir_pdf_por_modo(ruta, modo)
             if tipo == 'zip':

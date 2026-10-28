@@ -12,6 +12,7 @@ import io
 import logging
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -43,6 +44,17 @@ log = logging.getLogger(__name__)
 
 NIVELES_COMPRESION = ('baja', 'media', 'alta', 'ultra')
 MODOS_DIVISION = ('todas', 'pares', 'impares')
+MAX_ARCHIVOS_DIVISION = 500
+MAX_TEXTO_GRUPOS = 10_000
+# Caracteres que se recortan alrededor de cada trozo del texto de grupos: la unión de lo que
+# recortan str.strip() de Python y trim() de JavaScript, más el BOM (U+FEFF) que llega al
+# pegar desde Excel o el bloc de notas. Tiene que ir en pareja con ESPACIOS_GRUPOS de
+# app/static/js/grupos.js: si difieren, el navegador y el servidor no aceptarían lo mismo.
+_ESPACIOS_GRUPOS = (
+    '\t\n\x0b\x0c\r\x1c\x1d\x1e\x1f \x85\xa0\U00001680'
+    '\U00002000\U00002001\U00002002\U00002003\U00002004\U00002005\U00002006\U00002007\U00002008\U00002009\U0000200a'
+    '\U00002028\U00002029\U0000202f\U0000205f\U00003000\U0000feff'
+)
 
 # ── Validación ────────────────────────────────────────────────────
 
@@ -163,7 +175,8 @@ def dividir_pdf(ruta, inicio, fin):
 
 def dividir_pdf_por_modo(ruta, modo):
     if modo not in MODOS_DIVISION:
-        raise ValueError(f'Modo de división no soportado. Opciones: rango, {", ".join(MODOS_DIVISION)}')
+        raise ValueError('Modo de división no soportado. Opciones: '
+                         f'rango, {", ".join(MODOS_DIVISION)}, cada, personalizado')
 
     with abrir_pdf(ruta) as src:
         total = src.page_count
@@ -186,6 +199,86 @@ def dividir_pdf_por_modo(ruta, modo):
             raise ValueError('No hay páginas para el modo seleccionado')
         src.select(indices)
         return _guardar(src), 'pdf'
+
+
+def analizar_grupos(texto, total):
+    """
+    Convierte '1-2,3-5,6' en [(1, 2), (3, 5), (6, 6)] (páginas desde 1, ambas incluidas,
+    en el orden escrito). Se pueden dejar páginas fuera y escribir los grupos en cualquier
+    orden, pero una página no puede estar en dos grupos.
+    Lanza ValueError con un mensaje pensado para quien lo lee en pantalla.
+    """
+    if len(texto) > MAX_TEXTO_GRUPOS:
+        raise ValueError('El texto de los grupos es demasiado largo.')
+
+    trozos = [t.strip(_ESPACIOS_GRUPOS) for t in texto.split(',')]
+    trozos = [t for t in trozos if t]
+    if not trozos:
+        raise ValueError('Escribe al menos un grupo de páginas, por ejemplo 1-2,3-5,6.')
+
+    grupos = []
+    for trozo in trozos:
+        m = re.fullmatch(r'([0-9]{1,6})(?:-([0-9]{1,6}))?', trozo)
+        if not m:
+            visto = trozo if len(trozo) <= 40 else trozo[:40] + '…'
+            raise ValueError(f'«{visto}» no es un grupo válido; escribe un número o un tramo como 3-5.')
+        inicio = int(m.group(1))
+        fin = int(m.group(2)) if m.group(2) else inicio
+        grupos.append((inicio, fin))
+
+    for inicio, fin in grupos:
+        for pagina in (inicio, fin):
+            if pagina < 1 or pagina > total:
+                raise ValueError(f'La página {pagina} no existe; el documento tiene de la 1 a la {total}.')
+
+    for inicio, fin in grupos:
+        if inicio > fin:
+            raise ValueError(f'El grupo {inicio}-{fin} está al revés: la página inicial es mayor que la final.')
+
+    if len(grupos) > MAX_ARCHIVOS_DIVISION:
+        raise ValueError(f'Hay {len(grupos)} grupos, más de los {MAX_ARCHIVOS_DIVISION} permitidos.')
+
+    usadas = set()
+    for inicio, fin in grupos:
+        for pagina in range(inicio, fin + 1):
+            if pagina in usadas:
+                raise ValueError(f'La página {pagina} está en más de un grupo.')
+            usadas.add(pagina)
+
+    return grupos
+
+
+def grupos_por_bloques(total, paginas_por_archivo):
+    """Parte `total` páginas en bloques de `paginas_por_archivo`; el último puede quedar más corto."""
+    if paginas_por_archivo < 1:
+        raise ValueError('Las páginas por archivo deben ser al menos 1.')
+
+    cantidad = -(-total // paginas_por_archivo)  # división hacia arriba
+    if cantidad > MAX_ARCHIVOS_DIVISION:
+        raise ValueError(
+            f'Saldrían {cantidad} archivos, más de los {MAX_ARCHIVOS_DIVISION} permitidos. '
+            'Usa «Cada página por separado».'
+        )
+
+    return [
+        (inicio, min(inicio + paginas_por_archivo - 1, total))
+        for inicio in range(1, total + 1, paginas_por_archivo)
+    ]
+
+
+def dividir_por_grupos(ruta, grupos, base='documento'):
+    """ZIP con un PDF por grupo (inicio, fin; páginas desde 1, ambas incluidas), en el orden dado."""
+    if not grupos:
+        raise ValueError('No hay páginas para dividir')
+
+    ancho = max(2, len(str(len(grupos))))
+    out = io.BytesIO()
+    with abrir_pdf(ruta) as src, zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        for numero, (inicio, fin) in enumerate(grupos, start=1):
+            with fitz.open() as salida:
+                salida.insert_pdf(src, from_page=inicio - 1, to_page=fin - 1)
+                zf.writestr(f'{base}_{numero:0{ancho}d}.pdf', _guardar(salida))
+    return out.getvalue()
 
 
 # ── Conversión ────────────────────────────────────────────────────

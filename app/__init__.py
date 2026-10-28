@@ -8,7 +8,7 @@ from flask import Flask, jsonify
 
 __author__    = 'Bairon Nicolas Calle Rivera'
 __email__     = 'b41r0nn@gmail.com'
-__version__   = '2.3.1'
+__version__   = '2.4.0'
 __copyright__ = 'Copyright (c) 2026 Bairon Nicolas Calle Rivera'
 __license__   = 'CC BY-NC 4.0 — Solo uso no comercial'
 

@@ -148,6 +148,79 @@ def test_division_rango_y_modos(client):
     assert len(zipfile.ZipFile(io.BytesIO(r.data)).namelist()) == 5
 
 
+def test_division_cada_entrega_un_archivo_por_bloque(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'escaneo.pdf'),
+                                           'modo': 'cada', 'paginas_por_archivo': '2'})
+    assert r.status_code == 200
+    assert r.mimetype == 'application/zip'
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    assert zf.namelist() == [f'escaneo_{i:02d}.pdf' for i in range(1, 6)]
+    assert all(fitz.open('pdf', zf.read(n)).page_count == 2 for n in zf.namelist())
+
+
+def test_division_personalizado_respeta_los_grupos_y_su_orden(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'tanda.pdf'),
+                                           'modo': 'personalizado', 'grupos': '6-7,1-2,3-5'})
+    assert r.status_code == 200
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    assert [fitz.open('pdf', zf.read(n)).page_count for n in zf.namelist()] == [2, 2, 3]
+
+
+def test_division_personalizado_deja_fuera_las_paginas_no_listadas(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 't.pdf'),
+                                           'modo': 'personalizado', 'grupos': '1-3'})
+    zf = zipfile.ZipFile(io.BytesIO(r.data))
+    assert len(zf.namelist()) == 1
+    assert fitz.open('pdf', zf.read(zf.namelist()[0])).page_count == 3
+
+
+@pytest.mark.parametrize('datos', [
+    {'modo': 'cada', 'paginas_por_archivo': '0'},
+    {'modo': 'cada', 'paginas_por_archivo': '-3'},
+    {'modo': 'cada', 'paginas_por_archivo': 'abc'},
+    {'modo': 'cada'},
+    {'modo': 'personalizado', 'grupos': '1-4,3-6'},
+    {'modo': 'personalizado', 'grupos': '1-2,40-50'},
+    {'modo': 'personalizado', 'grupos': ''},
+    {'modo': 'personalizado'},
+    {'modo': 'inventado'},
+])
+def test_division_rechaza_entradas_invalidas(client, datos):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'd.pdf'), **datos})
+    assert r.status_code == 400
+    mensaje = r.get_json()['error']
+    # Lo lee quien usa la herramienta: ningún límite sin poner se cuela en la frase.
+    assert mensaje and 'None' not in mensaje
+
+
+@pytest.mark.parametrize('datos, esperado', [
+    ({'modo': 'cada', 'paginas_por_archivo': '0'}, 'El parámetro "paginas_por_archivo" debe ser 1 o más'),
+    ({'modo': 'rango', 'inicio': '0', 'fin': '3'}, 'El parámetro "inicio" debe ser 1 o más'),
+    ({'modo': 'rango', 'inicio': '1', 'fin': '-2'}, 'El parámetro "fin" debe ser 1 o más'),
+])
+def test_los_limites_se_dicen_con_las_cotas_que_existen(client, datos, esperado):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'd.pdf'), **datos})
+    assert r.status_code == 400
+    assert r.get_json()['error'] == esperado
+
+
+def test_division_cada_con_pdf_cifrado_pide_la_contrasena(client):
+    cifrado = client.post('/api/cifrado', data={'archivo': _archivo(pdf_bytes(paginas=4), 'c.pdf'),
+                                                'contrasena': 'clave', 'confirmar': 'clave'}).data
+    r = client.post('/api/division', data={'archivo': _archivo(cifrado, 'c.pdf'),
+                                           'modo': 'cada', 'paginas_por_archivo': '2'})
+    assert r.status_code == 400
+    assert 'contraseña' in r.get_json()['error']
+
+
+def test_division_nombre_con_ruta_no_escapa_del_zip(client):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=4), '../../factura.pdf'),
+                                           'modo': 'cada', 'paginas_por_archivo': '2'})
+    nombres = zipfile.ZipFile(io.BytesIO(r.data)).namelist()
+    assert nombres == ['factura_01.pdf', 'factura_02.pdf']
+    assert not any('..' in n or '/' in n or '\\' in n for n in nombres)
+
+
 def test_cifrado_aes256(client):
     r = client.post('/api/cifrado', data={'archivo': _archivo(pdf_bytes(), 'c.pdf'),
                                           'contrasena': 'clave', 'confirmar': 'clave'})
@@ -325,3 +398,41 @@ def test_editor_pdf_protegido(client):
     s = _crear_sesion(client, cifrado, contrasena='abc')
     assert s['desbloqueado'] is True
     assert not fitz.open('pdf', client.get(f"/api/edicion/{s['id']}/pdf").data).needs_pass
+
+
+def test_panel_division_ofrece_los_seis_modos(client):
+    html = client.get('/').get_data(as_text=True)
+    for valor in ('rango', 'todas', 'pares', 'impares', 'cada', 'personalizado'):
+        assert f'value="{valor}"' in html
+    # Un rango sigue siendo el que viene marcado
+    assert re.search(r'id="div-rango"[^>]*\bchecked\b', html)
+    assert 'id="div-paginas-por-archivo"' in html and 'value="2"' in html
+    assert 'id="div-grupos"' in html and 'id="div-rellenar"' in html
+    assert re.search(r'/static/js/grupos\.js\?v=\d+', html)
+
+
+def test_grupos_js_se_carga_antes_de_main_js(client):
+    # main.js llama a analizarGrupos/gruposPorBloques al cargar; invertir el orden
+    # deja la pestaña Dividir muerta sin que falle ninguna otra prueba.
+    html = client.get('/').get_data(as_text=True)
+    assert html.index('grupos.js') < html.index('main.js')
+
+
+def test_vista_de_paginas_recibe_las_rutas_de_pdfjs(client):
+    # vista-paginas.js no puede usar url_for: las rutas llegan por data-… con su ?v=
+    html = client.get('/').get_data(as_text=True)
+    m = re.search(r'id="div-vista"[^>]*data-pdfjs="(/static/pdfjs/build/pdf\.mjs\?v=\d+)"'
+                  r'[^>]*data-worker="(/static/pdfjs/build/pdf\.worker\.mjs\?v=\d+)"', html)
+    assert m
+    for ruta in m.groups():
+        r = client.get(ruta)
+        assert r.status_code == 200 and r.mimetype == 'text/javascript'
+        r.close()
+    assert re.search(r'/static/js/vista-paginas\.js\?v=\d+', html)
+
+
+def test_el_boton_de_ver_paginas_esta_disponible(client):
+    # Nace con hidden en la Tarea 4 porque la vista no existía; ahora debe estar visible.
+    html = client.get('/').get_data(as_text=True)
+    m = re.search(r'<button[^>]*id="div-ver-paginas"[^>]*>', html)
+    assert m and 'hidden' not in m.group(0)

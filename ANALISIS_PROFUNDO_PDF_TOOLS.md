@@ -6,6 +6,35 @@
 
 ---
 
+> ## ⚠️ Esto es una foto de abril de 2026, no el estado de hoy
+>
+> Este documento describe la aplicación **tal como estaba el 13 de abril de 2026**, cuando
+> era la versión 1.x. Se conserva porque varias de sus recomendaciones guiaron el trabajo
+> posterior, pero **no sirve para saber cómo funciona la aplicación ahora**. Para eso está
+> el `README.md`, que sí se mantiene al día.
+>
+> Lo escrito aquí se ha revisado el 28/10/2026 y las afirmaciones que habían quedado
+> **falsas** llevan una corrección marcada `ACTUALIZADO`. El resto del texto se deja como
+> estaba: es un registro de aquel momento, y reescribirlo entero lo convertiría en otra
+> cosa.
+>
+> Lo más importante que ha cambiado desde entonces:
+>
+> | Entonces decía | Hoy |
+> |---|---|
+> | `/admin/logs` sin autenticación | Pide contraseña (`X-Admin-Password`, comparación en tiempo constante); sin contraseña configurada el panel queda deshabilitado |
+> | 3 modos de división | 6: rango, cada página, pares, impares, **cada N páginas** y **grupos personalizados** |
+> | «Sin opción de stride personalizado» (hallazgo) | Resuelto en v2.4.0: es el modo *Cada N páginas* |
+> | 3 niveles de compresión | 4 (se añadió *ultra*) |
+> | Sin detección de PDFs dañados | `validar_pdf` valida MIME, cabecera y legibilidad antes de procesar |
+> | Sin pruebas | 159 pruebas `pytest` |
+> | No existía el editor | Pestaña *Editar* con visor PDF.js y sesiones versionadas |
+>
+> La auditoría de seguridad de octubre (`AUDITORIA_2026-10.md`) corrigió diez hallazgos
+> que este documento no llegó a ver.
+
+---
+
 ## 📍 TABLA DE CONTENIDOS
 1. [Resumen Ejecutivo](#resumen-ejecutivo)
 2. [Arquitectura General](#arquitectura-general)
@@ -23,9 +52,9 @@
 ### Estado Actual
 **PDF ToolOffice** es una aplicación web construida con **Flask** (Python) que proporciona una interfaz moderna para manipulación de documentos PDF, con soporte para:
 - ✅ Unión múltiple de PDFs
-- ✅ División por rango o modo (pares, impares, todas)
+- ✅ División por rango o modo (pares, impares, todas) — *ACTUALIZADO: hoy son seis modos; se añadieron **cada N páginas** y **grupos personalizados** con vista de miniaturas (v2.4.0)*
 - ✅ Conversión bidireccional (PDF ↔ DOCX, PDF ↔ XLSX)
-- ✅ Compresión con 3 niveles (baja, media, alta)
+- ✅ Compresión con 3 niveles (baja, media, alta) — *ACTUALIZADO: hoy son cuatro, con **ultra***
 - ✅ Cifrado con contraseña
 - ✅ Sistema de logs en SQLite
 - ✅ Interfaz responsive con arrastrable (drag-and-drop)
@@ -167,7 +196,7 @@ Validación → Guardar Temporal → Procesar → Registrar Log → Responder
 | `/api/conversion` | POST | archivo:PDF\|DOCX\|XLSX, dirección | PDF\|DOCX\|XLSX | ✅ Dirección |
 | `/api/compresion` | POST | archivo:PDF, nivel | PDF | ✅ Nivel (baja/media/alta) |
 | `/api/cifrado` | POST | archivo:PDF, contraseña | PDF | ✅ Contraseña coincide |
-| `/admin/logs` | GET | - | HTML tabla | ❌ SIN AUTENTICACIÓN |
+| `/admin/logs` | GET | - | HTML tabla | ❌ SIN AUTENTICACIÓN — **ACTUALIZADO: ya no. Exige la cabecera `X-Admin-Password`, comparada en tiempo constante, y sin contraseña configurada el panel queda deshabilitado (corregido en la auditoría de octubre, hallazgo S3)** |
 
 **Funciones Auxiliares Clave:**
 ```python
@@ -213,6 +242,15 @@ dividir_pdf_por_modo(ruta, modo)                  # 'pares'|'impares'|'todas'
 - ✅ Soporte para 3 modos de división
 - ✅ Manejo de errores para rangos inválidos
 - ❌ Sin opción de stride personalizado
+
+> **ACTUALIZADO (28/10/2026).** El hallazgo «sin opción de stride personalizado» se
+> resolvió en la v2.4.0: es el modo *Cada N páginas*. A `services.py` se añadieron
+> `analizar_grupos(texto, total)`, `grupos_por_bloques(total, paginas_por_archivo)` y
+> `dividir_por_grupos(ruta, grupos, base)`, y `/api/division` acepta dos modos más,
+> `cada` y `personalizado`. El navegador tiene una copia de la misma sintaxis en
+> `static/js/grupos.js`, atada a la de Python por pruebas de paridad, y
+> `static/js/vista-paginas.js` dibuja las páginas para ajustar los grupos a mano.
+> Detalle en el `README.md` y en `DISENO_DIVISION_BLOQUES.md`.
 
 #### 3.3 Conversión PDF ↔ Office
 ```

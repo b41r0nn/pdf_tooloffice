@@ -45,6 +45,9 @@ app/database/*.db
 /build/
 *.egg-info/
 
+# Cuaderno de trabajo de los agentes (notas de ejecución, no código)
+.superpowers/
+
 # Archivos sueltos que dejan las pruebas manuales del editor
 /test_editad*.pdf
 /test_editar*.pdf

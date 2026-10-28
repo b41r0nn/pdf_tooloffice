@@ -66,6 +66,10 @@ document.querySelectorAll('input[name="modo-div"]').forEach(radio => {
 // ── División: recuento en vivo de los archivos que saldrán ─────────
 // Total de páginas del PDF elegido en Dividir (null mientras no se sepa).
 window._totalPaginasDivision = null;
+// Por qué no se sabe: lo que respondió /api/paginas (un PDF cifrado, uno dañado…).
+// Sin esto la pantalla callaba y, al pedir las páginas, decía "sube primero el PDF"
+// de un archivo que ya estaba subido.
+window._motivoSinTotalDivision = null;
 let _archivoDivisionActual = null;
 
 function textoRecuentoDivision(resultado, paginasUltimo) {
@@ -80,29 +84,36 @@ function textoRecuentoDivision(resultado, paginasUltimo) {
 
 function actualizarRecuentoDivision() {
   const total = window._totalPaginasDivision;
+  // Sin total, en lugar de quedarse en blanco se dice por qué no se pudo leer el PDF.
+  const motivo = window._motivoSinTotalDivision || '';
   const cuentaCada = document.getElementById('div-cuenta');
   const cuentaGrupos = document.getElementById('div-grupos-cuenta');
 
   if (cuentaCada) {
     const porArchivo = Number(document.getElementById('div-paginas-por-archivo').value);
     if (!total) {
-      cuentaCada.textContent = '';
+      cuentaCada.textContent = motivo;
     } else {
       const resultado = gruposPorBloques(total, porArchivo);
-      const ultimo = resultado.grupos ? total - (resultado.grupos.length - 1) * porArchivo : 0;
-      cuentaCada.textContent = textoRecuentoDivision(resultado, ultimo < porArchivo ? ultimo : 0);
+      const grupos = resultado.grupos || [];
+      const ultimo = grupos.length ? total - (grupos.length - 1) * porArchivo : 0;
+      // Con un solo archivo, "el último archivo tendrá N páginas" no añade nada.
+      const corto = grupos.length > 1 && ultimo < porArchivo ? ultimo : 0;
+      cuentaCada.textContent = textoRecuentoDivision(resultado, corto);
     }
   }
 
   if (cuentaGrupos) {
     const texto = document.getElementById('div-grupos').value;
-    cuentaGrupos.textContent = total && texto.trim() ? textoRecuentoDivision(analizarGrupos(texto, total), 0) : '';
+    if (!total) cuentaGrupos.textContent = motivo;
+    else cuentaGrupos.textContent = texto.trim() ? textoRecuentoDivision(analizarGrupos(texto, total), 0) : '';
   }
 }
 
 function olvidarTotalDivision() {
   _archivoDivisionActual = null;
   window._totalPaginasDivision = null;
+  window._motivoSinTotalDivision = null;
   actualizarRecuentoDivision();
 }
 
@@ -111,7 +122,10 @@ document.getElementById('div-grupos')?.addEventListener('input', actualizarRecue
 
 document.getElementById('div-rellenar')?.addEventListener('click', () => {
   const total = window._totalPaginasDivision;
-  if (!total) { showToast('Sube primero el PDF para saber cuántas páginas tiene'); return; }
+  if (!total) {
+    showToast(window._motivoSinTotalDivision || 'Sube primero el PDF para saber cuántas páginas tiene');
+    return;
+  }
   const resultado = gruposPorBloques(total, Number(document.getElementById('div-rellenar-n').value));
   if (resultado.error) { showToast(resultado.error); return; }
   document.getElementById('div-grupos').value = formatearGrupos(resultado.grupos);
@@ -136,9 +150,18 @@ function handleFiles(zone, files) {
   if (!listEl) return;
   // En las herramientas de un solo archivo, el nuevo reemplaza al anterior
   const input = zone.querySelector('input[type="file"]');
-  if (input && !input.multiple && files.length) listEl.innerHTML = '';
+  if (input && !input.multiple && files.length) {
+    listEl.innerHTML = '';
+    // Si el que se va era el PDF de Dividir, el recuento no puede seguir
+    // describiéndolo: el reemplazo puede ser rechazado (p. ej. por tamaño).
+    if (listEl.closest('#panel-division')) olvidarTotalDivision();
+  }
   Array.from(files).forEach(file => {
-    if (file.size > MAX_BYTES) { showToast(`"${file.name}" supera el límite de ${MAX_MB} MB`); return; }
+    if (file.size > MAX_BYTES) {
+      // Sin la salida, quien escanea una tanda grande se queda sin siguiente paso.
+      showToast(`"${file.name}" supera el límite de ${MAX_MB} MB. Reduce su tamaño en la pestaña Comprimir.`);
+      return;
+    }
     addFileItem(listEl, file);
     updatePreview(zone, file);
   });
@@ -227,10 +250,17 @@ function updatePreview(zone, file) {
         if (pagesEl) pagesEl.textContent = d.paginas ? `${d.paginas} páginas` : 'N/D';
         if (esDivision && _archivoDivisionActual === file) {
           window._totalPaginasDivision = d.paginas || null;
+          window._motivoSinTotalDivision = d.paginas ? null : (d.error || null);
           actualizarRecuentoDivision();
         }
       })
-      .catch(() => { if (pagesEl) pagesEl.textContent = 'N/D'; });
+      .catch(() => {
+        if (pagesEl) pagesEl.textContent = 'N/D';
+        if (esDivision && _archivoDivisionActual === file) {
+          window._motivoSinTotalDivision = 'No se pudo leer el PDF para saber cuántas páginas tiene';
+          actualizarRecuentoDivision();
+        }
+      });
   } else {
     if (pagesEl) pagesEl.textContent = formatSize(file.size);
   }

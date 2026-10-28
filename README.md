@@ -112,7 +112,7 @@ Pestaña **Dividir**. Seis maneras de sacar páginas de un PDF:
 
 Nombres dentro del ZIP: en *Cada N páginas* y *Grupos personalizados* son `nombre_01.pdf`, `nombre_02.pdf`… (el número sigue el orden de los grupos), para renombrarlos con facilidad; en *Cada página por separado* son `pagina_01.pdf`, `pagina_02.pdf`… (con tantos ceros como necesite el total de páginas).
 
-*Cada N páginas* y *Grupos personalizados* entregan como máximo 500 archivos por división; pasado ese tope la pantalla lo avisa y sugiere *Cada página por separado*.
+*Cada N páginas* y *Grupos personalizados* entregan como máximo 500 archivos por división; pasado ese tope la pantalla lo avisa, y en *Cada N páginas* sugiere además *Cada página por separado*.
 
 **Ver páginas** (en *Grupos personalizados*): muestra una miniatura de cada página, agrupadas en recuadros, una por documento. Se ajusta con el ratón o el dedo: **cortar** un grupo en dos, **unir** un grupo con el siguiente, **descartar** una página (por ejemplo, la cara en blanco de un documento de 3 hojas escaneado a doble cara) o **reagrupar** cada N páginas. Al abrirla parte de lo que esté escrito en el campo de grupos (o de grupos parejos si está vacío), y cada cambio vuelve a escribir el texto `1-2,3-5,6`; mientras la vista está abierta ese campo queda en solo lectura. Si los grupos escritos estaban en otro orden (por ejemplo `6-7,1-2`), la vista los ordena por página (`1-2,6-7`) y lo avisa: son los mismos archivos, pero cambia cuál es el `_01` y cuál el `_02`, es decir, qué páginas acaban en qué archivo. El texto también se puede escribir directamente, sin abrir la vista. Las miniaturas se dibujan en el navegador con el PDF.js que ya trae la app, sin enviar nada más al servidor.
 
@@ -325,7 +325,7 @@ Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de ar
 - **Cada N páginas**: si todos los documentos tienen el mismo largo, se indica N y sale un ZIP con un archivo cada N páginas. La pantalla avisa cuántos archivos saldrán antes de empezar.
 - **Grupos personalizados**: para documentos de largos distintos. Se escribe, por ejemplo, `1-2,3-5,6` (el primero con las páginas 1 y 2, el segundo con la 3 a la 5, el tercero con la 6) y sale un ZIP con un archivo por grupo. El texto se puede escribir directamente; el botón *Rellenar cada N páginas* lo llena solo como punto de partida.
 - **Ver páginas**: muestra las páginas como miniaturas, en un recuadro por documento, para comprobar a simple vista dónde empieza y termina cada uno. Ahí mismo se corrige con un clic: *cortar* un documento en dos, *unir* uno con el siguiente, *descartar* una página (la cara en blanco de un documento de 3 hojas escaneado a doble cara, por ejemplo) o *reagrupar* todo cada N páginas. El texto de grupos se escribe solo con cada cambio. Con 100 páginas abre al instante: solo dibuja las miniaturas que se están viendo.
-- Los archivos del ZIP se llaman `nombre_01.pdf`, `nombre_02.pdf`… para renombrarlos con el número de factura.
+- En estos dos modos los archivos del ZIP se llaman `nombre_01.pdf`, `nombre_02.pdf`… para renombrarlos con el número de factura (*Cada página por separado* sigue dando `pagina_01.pdf`).
 - Verificado de 320 a 1440 px de ancho (celular a monitor) sin desbordes, con la vista abierta y cerrada.
 - Sin dependencias nuevas: usa PyMuPDF, el PDF.js ya incluido y `zipfile` de Python. Los modos de antes (rango, cada página, pares, impares) no cambian.
 

@@ -599,3 +599,27 @@ git commit -m "Version 2.4.0: division en bloques y grupos personalizados"
 ## Pendiente después de entregar
 
 Medir con una tanda real escaneada (§12 del diseño): tamaño del PDF frente al límite de 50 MB y memoria del contenedor al armar el ZIP. Ese archivo lo aporta quien usa la impresora; hasta que llegue, los dos riesgos siguen abiertos.
+
+**Pruebas automáticas de la mitad asíncrona de la vista de páginas (guarda de generación).**
+Hoy `tests/test_vista_paginas_js.py` cubre solo `crearEstadoGrupos`, que es puro. La
+secuencia de carga de `vista-paginas.js` —`cargarDocumento` + la guarda de generación que
+tira una carga que llega tarde— no tiene ninguna prueba: revertir la guarda no haría fallar
+nada, y es justo lo que evita que, con la tanda de 100 páginas, se acaben viendo las páginas
+del PDF anterior. La evidencia que hay es manual.
+
+Cómo hacerlo, por el mismo camino que ya abrió `tests/test_grupos_js.py` (node desde pytest):
+
+1. Extraer la secuencia de carga a un ayudante puro e inyectable, fuera de la IIFE del DOM y
+   exportado en node junto a `crearEstadoGrupos`: algo como
+   `cargar({ import: …, getDocument: …, arrayBuffer: … }, elArchivo, mia, vigente)`, sin tocar
+   `window`, `vista.dataset` ni los lienzos. Los tres dobles son funciones que devuelven
+   promesas que la prueba resuelve a mano (*deferred*).
+2. Desde node, lanzar la carga A, lanzar la carga B (que incrementa la generación) y resolver
+   los *deferred* en orden A-luego-B; comprobar que A se descarta sin asignar `documento` ni
+   `archivo`, que devuelve `false`, y que la tarea de A se destruye. Repetir con el cierre de
+   la vista en medio (`cerrar()` entre A y su resolución).
+3. Fijar también el caso contrario (una sola carga, nada que descartar) para que la prueba
+   falle si el ayudante se vuelve un `return false` constante.
+
+Se deja fuera de la ronda de correcciones de la revisión final a propósito: refactoriza la
+pieza más delicada de la rama justo antes de llevarla al servidor de producción.

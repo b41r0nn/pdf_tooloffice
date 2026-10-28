@@ -85,7 +85,15 @@ def entero(nombre, defecto, minimo=None, maximo=None):
     except (TypeError, ValueError):
         raise ValueError(f'El parámetro "{nombre}" debe ser un número entero')
     if (minimo is not None and numero < minimo) or (maximo is not None and numero > maximo):
-        raise ValueError(f'El parámetro "{nombre}" debe estar entre {minimo} y {maximo}')
+        # La frase se arma con los límites que REALMENTE existen: con solo `minimo`
+        # el texto de antes decía "debe estar entre 1 y None", que no se puede leer.
+        if minimo is not None and maximo is not None:
+            limite = f'estar entre {minimo} y {maximo}'
+        elif minimo is not None:
+            limite = f'ser {minimo} o más'
+        else:
+            limite = f'ser {maximo} o menos'
+        raise ValueError(f'El parámetro "{nombre}" debe {limite}')
     return numero
 
 

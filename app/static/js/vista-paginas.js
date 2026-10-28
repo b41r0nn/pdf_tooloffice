@@ -102,6 +102,9 @@
 
   const ANCHO_MINIATURA = 120;             // px de ancho de cada miniatura
   const MARGEN_OBSERVADOR = '300px';       // se adelanta a dibujar lo que está por entrar
+  // Red de seguridad: con un PDF cifrado /api/paginas ya responde 400 y `abrir()`
+  // sale antes de llegar a PDF.js con ese mismo mensaje. Esta constante cubre el
+  // caso raro de un PDF que el servidor sí mide y PDF.js no abre sin contraseña.
   const AVISO_CIFRADO = 'El archivo PDF está cifrado: ingresa la contraseña correcta para procesarlo';
 
   const vista = document.getElementById('div-vista');
@@ -385,7 +388,7 @@
     if (!vigente(mia)) return false;
     const tarea = pdfjs.getDocument({ data: datos });
     const doc = await tarea.promise;
-    if (!vigente(mia)) { tarea.destroy(); return false; }
+    if (!vigente(mia)) { void tarea.destroy().catch(() => {}); return false; }
     // Se asignan juntos para que siga valiendo «archivo es el File de `documento`».
     documento = doc;
     archivo = elArchivo;
@@ -395,7 +398,12 @@
   async function abrir() {
     const mia = ++generacion;
     const total = Number(window._totalPaginasDivision) || 0;
-    if (!total) { aviso('Sube primero el PDF para saber cuántas páginas tiene'); return; }
+    if (!total) {
+      // Si /api/paginas rechazó el PDF (cifrado, dañado…), se repite SU mensaje:
+      // decir "sube primero el PDF" de un archivo ya subido no explica nada.
+      aviso(window._motivoSinTotalDivision || 'Sube primero el PDF para saber cuántas páginas tiene');
+      return;
+    }
 
     const item = document.querySelector('#panel-division .file-item');
     if (!item || !item._fileObj) { aviso('Sube primero el PDF para ver sus páginas'); return; }
@@ -416,11 +424,14 @@
     // que se escribieron los grupos: «6-7,1-2» se dibuja —y se dividirá— como
     // «1-2,6-7», con el contenido de los dos archivos intercambiado. Es
     // inevitable y está bien, pero no puede pasar en silencio.
+    // El aviso se guarda y NO se da aquí: hasta que `refrescar` reescriba el campo,
+    // este sigue teniendo el texto escrito, así que decir "ahora son …" sería falso —y
+    // si la carga falla o se cierra la vista, el campo no se reescribe nunca.
     const pedido = formatearGrupos(resultado.grupos);
     const dibujado = formatearGrupos(estado.grupos());
-    if (pedido !== dibujado) {
-      aviso(`Los grupos se reordenaron para poder dibujarlos: ahora son «${dibujado}».`);
-    }
+    const notaReorden = pedido === dibujado
+      ? null
+      : `Los grupos se reordenaron para poder dibujarlos: ahora son «${dibujado}».`;
 
     abierta = true;
     vista.hidden = false;
@@ -429,6 +440,9 @@
     // lo dejaría diciendo algo distinto de lo que se ve. Su equivalente dentro
     // de la vista es «Reagrupar», que sí pasa por el estado.
     if (btnRellenar) btnRellenar.disabled = true;
+    // Reagrupar reescribe el campo: con la carga a medias borraría el texto del
+    // usuario y, si la carga falla, no habría de dónde recuperarlo.
+    if (btnReagrupar) btnReagrupar.disabled = true;
     btnAbrir.setAttribute('aria-expanded', 'true');
     btnAbrir.textContent = 'Ocultar páginas';
     if (resumen) resumen.textContent = 'Cargando las páginas…';
@@ -455,6 +469,13 @@
       return;
     }
     refrescar(null);
+    if (btnReagrupar) btnReagrupar.disabled = false;
+    // Ya se ve lo que dice el campo: ahora el aviso del reorden es cierto. Va además
+    // al resumen, que es `role="status"` y se queda, no se borra en 3,5 segundos.
+    if (notaReorden) {
+      aviso(notaReorden);
+      if (resumen) resumen.textContent += ` · ${notaReorden}`;
+    }
   }
 
   // ── Eventos ──────────────────────────────────────────────────────

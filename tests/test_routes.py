@@ -188,7 +188,20 @@ def test_division_personalizado_deja_fuera_las_paginas_no_listadas(client):
 def test_division_rechaza_entradas_invalidas(client, datos):
     r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'd.pdf'), **datos})
     assert r.status_code == 400
-    assert 'error' in r.get_json()
+    mensaje = r.get_json()['error']
+    # Lo lee quien usa la herramienta: ningún límite sin poner se cuela en la frase.
+    assert mensaje and 'None' not in mensaje
+
+
+@pytest.mark.parametrize('datos, esperado', [
+    ({'modo': 'cada', 'paginas_por_archivo': '0'}, 'El parámetro "paginas_por_archivo" debe ser 1 o más'),
+    ({'modo': 'rango', 'inicio': '0', 'fin': '3'}, 'El parámetro "inicio" debe ser 1 o más'),
+    ({'modo': 'rango', 'inicio': '1', 'fin': '-2'}, 'El parámetro "fin" debe ser 1 o más'),
+])
+def test_los_limites_se_dicen_con_las_cotas_que_existen(client, datos, esperado):
+    r = client.post('/api/division', data={'archivo': _archivo(pdf_bytes(paginas=10), 'd.pdf'), **datos})
+    assert r.status_code == 400
+    assert r.get_json()['error'] == esperado
 
 
 def test_division_cada_con_pdf_cifrado_pide_la_contrasena(client):

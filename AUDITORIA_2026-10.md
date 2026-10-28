@@ -54,6 +54,7 @@ Cada hallazgo se verificó reproduciéndolo (script o prueba) antes de corregirl
 ## Pendiente / fuera de alcance
 
 - **Desplegado** el 23/10/2026 en `app-web-1` (Docker en WSL, puerto 5000): v2.1.0 con LibreOffice 25.2 y fuentes libres, usuario sin privilegios, volúmenes corregidos.
+  *Actualización 28/10/2026: ese destino quedó atrás. Desde la v2.2.0, ese mismo 23/10, producción es el contenedor `pdf_tooloffice` en el servidor `192.168.1.250:3000`, desplegado desde `~/pdf_tooloffice` con `docker-compose.prod.yml`. La receta está en el `README.md`.*
 - Aviso `The fitz API is deprecated` en el log: lo emite `pdf2docx` (dependencia externa); el código propio ya usa `import pymupdf`.
 - **Licencias**: PyMuPDF es AGPL-3.0 y la app declara CC BY-NC 4.0 (licencia no pensada para software). Para uso interno no hay conflicto práctico; si se distribuye o se ofrece a terceros conviene revisarlo.
 - Sin autenticación en la interfaz principal ni límite de peticiones: aceptable solo en red interna.

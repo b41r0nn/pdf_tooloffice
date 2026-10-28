@@ -18,6 +18,88 @@
 (function () {
   'use strict';
 
+  // ── El estado: dos conjuntos, y los grupos salen de ellos ────────
+  // Aquí no se toca el DOM a propósito: es el corazón de la vista y así se puede
+  // probar con node, como grupos.js (tests/test_vista_paginas_js.py).
+  function crearEstadoGrupos(total) {
+    const descartadas = new Set();
+    const cortes = new Set();
+
+    function grupos() {
+      const salida = [];
+      let inicio = null;
+      const cerrarTramo = (fin) => {
+        if (inicio !== null && fin >= inicio) salida.push([inicio, fin]);
+        inicio = null;
+      };
+      for (let pagina = 1; pagina <= total; pagina++) {
+        if (descartadas.has(pagina)) { cerrarTramo(pagina - 1); continue; }
+        if (inicio === null) inicio = pagina;
+        if (cortes.has(pagina)) cerrarTramo(pagina);
+      }
+      cerrarTramo(total);
+      return salida;
+    }
+
+    // Siembra el estado con unos grupos: un corte al final de CADA uno y fuera
+    // las páginas que no aparecen en ninguno.
+    //
+    // El corte va también en el final del último a propósito. Ahí no estorba —el
+    // recorrido cierra igual al llegar a `total`— y en cambio evita un fallo feo:
+    // la sintaxis admite grupos desordenados («3-5,1-2», que las pruebas de
+    // paridad con el servidor fijan), así que «el último de la lista» no es «el
+    // que termina más tarde». Si el corte dependiera de la posición en la lista,
+    // «3-5,1-2» sobre 5 páginas perdería el corte de la página 2 y los dos
+    // archivos se fundirían en uno solo sin que nadie lo dijera.
+    function sembrar(lista) {
+      cortes.clear();
+      descartadas.clear();
+      const dentro = new Set();
+      lista.forEach(([inicio, fin]) => {
+        for (let pagina = inicio; pagina <= fin; pagina++) dentro.add(pagina);
+        cortes.add(fin);
+      });
+      for (let pagina = 1; pagina <= total; pagina++) {
+        if (!dentro.has(pagina)) descartadas.add(pagina);
+      }
+    }
+
+    // Solo rehace los cortes: las descartadas se respetan (es el «Reagrupar»).
+    function sembrarCortes(lista) {
+      cortes.clear();
+      lista.forEach(([, fin]) => cortes.add(fin));
+    }
+
+    function cortar(pagina) { cortes.add(pagina); }
+
+    function alternarDescarte(pagina) {
+      if (descartadas.has(pagina)) descartadas.delete(pagina);
+      else descartadas.add(pagina);
+    }
+
+    // Unir dos documentos seguidos: se quitan los cortes del tramo y se recuperan
+    // las páginas descartadas que hubiera en medio, porque el resultado tiene que
+    // ser un tramo seguido. Se ve al instante en el redibujado.
+    function unir(fin) {
+      const lista = grupos();
+      const indice = lista.findIndex(([, f]) => f === fin);
+      if (indice < 0 || indice >= lista.length - 1) return false;
+      const hasta = lista[indice + 1][1];
+      for (let pagina = fin; pagina < hasta; pagina++) {
+        cortes.delete(pagina);
+        if (pagina > fin) descartadas.delete(pagina);
+      }
+      return true;
+    }
+
+    return { total, descartadas, cortes, grupos, sembrar, sembrarCortes, cortar, unir, alternarDescarte };
+  }
+
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { crearEstadoGrupos };
+    return;   // en node no hay nada que cablear
+  }
+
   const ANCHO_MINIATURA = 120;             // px de ancho de cada miniatura
   const MARGEN_OBSERVADOR = '300px';       // se adelanta a dibujar lo que está por entrar
   const AVISO_CIFRADO = 'El archivo PDF está cifrado: ingresa la contraseña correcta para procesarlo';
@@ -36,15 +118,21 @@
 
   // ── Estado ───────────────────────────────────────────────────────
   let abierta = false;
-  let total = 0;
-  const descartadas = new Set();
-  const cortes = new Set();
+  let estado = crearEstadoGrupos(0);
+
+  // Cada apertura lleva su número. Cerrar o volver a abrir lo incrementa, así que
+  // una carga de PDF.js que llegue tarde sabe que ya no le toca y se tira en vez
+  // de pisar la vista nueva. Sin esto, con la tanda de 100 páginas del caso real
+  // —donde cargar tarda— se podían acabar viendo las páginas del PDF anterior.
+  let generacion = 0;
 
   // PDF.js y las miniaturas ya dibujadas, atadas al archivo del que salieron.
   let pdfjs = null;            // {getDocument, GlobalWorkerOptions}
-  let archivo = null;          // el File cuyas miniaturas están en memoria
+  let archivo = null;          // el File cuyo `documento` está cargado (se asignan juntos)
   let documento = null;        // PDFDocumentProxy
   const lienzos = new Map();   // nº de página → <canvas> (se reusa el nodo para no redibujar)
+
+  function vigente(mia) { return mia === generacion; }
 
   const observador = ('IntersectionObserver' in window)
     ? new IntersectionObserver((entradas) => {
@@ -58,46 +146,6 @@
 
   function aviso(mensaje) {
     if (typeof showToast === 'function') showToast(mensaje);
-  }
-
-  // ── Los grupos se derivan del estado ─────────────────────────────
-  function gruposDerivados() {
-    const grupos = [];
-    let inicio = null;
-    const cerrar = (fin) => {
-      if (inicio !== null && fin >= inicio) grupos.push([inicio, fin]);
-      inicio = null;
-    };
-    for (let pagina = 1; pagina <= total; pagina++) {
-      if (descartadas.has(pagina)) { cerrar(pagina - 1); continue; }
-      if (inicio === null) inicio = pagina;
-      if (cortes.has(pagina)) cerrar(pagina);
-    }
-    cerrar(total);
-    return grupos;
-  }
-
-  // Siembra el estado con unos grupos: cortes en el final de cada uno salvo el
-  // último, y fuera (descartadas) las páginas que no aparecen en ninguno.
-  function sembrar(grupos) {
-    cortes.clear();
-    descartadas.clear();
-    const dentro = new Set();
-    grupos.forEach(([inicio, fin], indice) => {
-      for (let pagina = inicio; pagina <= fin; pagina++) dentro.add(pagina);
-      if (indice < grupos.length - 1) cortes.add(fin);
-    });
-    for (let pagina = 1; pagina <= total; pagina++) {
-      if (!dentro.has(pagina)) descartadas.add(pagina);
-    }
-  }
-
-  // Solo rehace los cortes: las descartadas se respetan (es el «Reagrupar»).
-  function sembrarCortes(grupos) {
-    cortes.clear();
-    grupos.forEach(([, fin], indice) => {
-      if (indice < grupos.length - 1) cortes.add(fin);
-    });
   }
 
   // ── Dibujo ───────────────────────────────────────────────────────
@@ -143,7 +191,7 @@
   }
 
   function figuraDe(pagina) {
-    const fuera = descartadas.has(pagina);
+    const fuera = estado.descartadas.has(pagina);
     const figura = document.createElement('figure');
     figura.className = 'vista-pagina' + (fuera ? ' apagada' : '');
 
@@ -223,7 +271,7 @@
     contenedor.textContent = '';
     let claveActual = null;
     let fila = null;
-    for (let pagina = 1; pagina <= total; pagina++) {
+    for (let pagina = 1; pagina <= estado.total; pagina++) {
       const indice = grupoDe.has(pagina) ? grupoDe.get(pagina) : null;
       const clave = indice === null ? 'fuera' : 'g' + indice;
       if (clave !== claveActual) {
@@ -248,18 +296,18 @@
     if (observador) {
       lienzos.forEach((lienzo) => { if (!lienzo.dataset.listo) observador.observe(lienzo); });
     } else {
-      for (let pagina = 1; pagina <= total; pagina++) dibujarPagina(pagina);
+      for (let pagina = 1; pagina <= estado.total; pagina++) dibujarPagina(pagina);
     }
   }
 
   // Única salida del estado: redibuja, reescribe el campo y actualiza el resumen.
   function refrescar(foco) {
-    const grupos = gruposDerivados();
+    const grupos = estado.grupos();
     dibujar(grupos);
     campoGrupos.value = formatearGrupos(grupos);
     if (typeof actualizarRecuentoDivision === 'function') actualizarRecuentoDivision();
     if (resumen) {
-      const incluidas = total - descartadas.size;
+      const incluidas = estado.total - estado.descartadas.size;
       resumen.textContent = grupos.length === 0
         ? 'Ningún archivo: todas las páginas están descartadas.'
         : `${grupos.length} ${grupos.length === 1 ? 'documento' : 'documentos'} · `
@@ -272,37 +320,27 @@
   }
 
   // ── Acciones ─────────────────────────────────────────────────────
+  // Cada una toca el estado y pide un redibujado, moviendo el foco al control
+  // que deshace lo que se acaba de hacer, en el mismo sitio.
   function cortar(pagina) {
-    cortes.add(pagina);
-    // Lo contrario de cortar aquí es unir aquí: el foco va al botón que lo deshace.
+    estado.cortar(pagina);
     refrescar(`[data-unir="${pagina}"]`);
   }
 
-  // Unir dos documentos seguidos: se quitan los cortes del tramo y se recuperan
-  // las páginas descartadas que hubiera en medio, porque el resultado tiene que
-  // ser un tramo seguido. Se ve al instante en el redibujado.
   function unir(fin) {
-    const grupos = gruposDerivados();
-    const indice = grupos.findIndex(([, f]) => f === fin);
-    if (indice < 0 || indice >= grupos.length - 1) return;
-    const hasta = grupos[indice + 1][1];
-    for (let pagina = fin; pagina < hasta; pagina++) {
-      cortes.delete(pagina);
-      if (pagina > fin) descartadas.delete(pagina);
-    }
+    if (!estado.unir(fin)) return;
     refrescar(`[data-corte="${fin}"]`);
   }
 
   function alternarDescarte(pagina) {
-    if (descartadas.has(pagina)) descartadas.delete(pagina);
-    else descartadas.add(pagina);
+    estado.alternarDescarte(pagina);
     refrescar(`[data-descartar="${pagina}"]`);
   }
 
   function reagrupar() {
-    const resultado = gruposPorBloques(total, Number(campoN.value));
+    const resultado = gruposPorBloques(estado.total, Number(campoN.value));
     if (resultado.error) { aviso(resultado.error); return; }
-    sembrarCortes(resultado.grupos);
+    estado.sembrarCortes(resultado.grupos);
     refrescar(null);
   }
 
@@ -310,6 +348,7 @@
   function cerrar(devolverFoco) {
     if (!abierta) return;
     abierta = false;
+    generacion++;            // lo que esté cargando deja de valer
     vista.hidden = true;
     if (observador) observador.disconnect();
     contenedor.textContent = '';
@@ -320,27 +359,42 @@
     if (devolverFoco) btnAbrir.focus();
   }
 
-  async function cargarDocumento(elArchivo) {
-    if (documento && archivo === elArchivo) return;
+  // Devuelve true si al terminar la carga seguía siendo la de esta apertura.
+  // Tras CADA espera se comprueba la generación: si entretanto se cerró la vista
+  // o se volvió a abrir, esta carga se tira sin tocar `documento` ni `archivo`.
+  async function cargarDocumento(elArchivo, mia) {
+    if (documento && archivo === elArchivo) return true;
     if (documento) {
       // En PDF.js 6 lo que se destruye es la tarea de carga, no el documento: el
       // proxy no tiene destroy(). Se espera a que termine para no solapar workers.
-      await documento.loadingTask.destroy();
+      const vieja = documento.loadingTask;
       documento = null;
+      archivo = null;
+      await vieja.destroy();
+      if (!vigente(mia)) return false;
     }
     if (observador) observador.disconnect();
     lienzos.clear();
-    archivo = elArchivo;
     if (!pdfjs) {
       const modulo = await import(vista.dataset.pdfjs);
+      if (!vigente(mia)) return false;
       modulo.GlobalWorkerOptions.workerSrc = vista.dataset.worker;
       pdfjs = modulo;
     }
-    documento = await pdfjs.getDocument({ data: await elArchivo.arrayBuffer() }).promise;
+    const datos = await elArchivo.arrayBuffer();
+    if (!vigente(mia)) return false;
+    const tarea = pdfjs.getDocument({ data: datos });
+    const doc = await tarea.promise;
+    if (!vigente(mia)) { tarea.destroy(); return false; }
+    // Se asignan juntos para que siga valiendo «archivo es el File de `documento`».
+    documento = doc;
+    archivo = elArchivo;
+    return true;
   }
 
   async function abrir() {
-    total = Number(window._totalPaginasDivision) || 0;
+    const mia = ++generacion;
+    const total = Number(window._totalPaginasDivision) || 0;
     if (!total) { aviso('Sube primero el PDF para saber cuántas páginas tiene'); return; }
 
     const item = document.querySelector('#panel-division .file-item');
@@ -355,7 +409,19 @@
       : gruposPorBloques(total, Number(campoN.value));
     if (resultado.error) { aviso(resultado.error); return; }
 
-    sembrar(resultado.grupos);
+    estado = crearEstadoGrupos(total);
+    estado.sembrar(resultado.grupos);
+
+    // El modelo son dos conjuntos, y dos conjuntos no pueden guardar el orden en
+    // que se escribieron los grupos: «6-7,1-2» se dibuja —y se dividirá— como
+    // «1-2,6-7», con el contenido de los dos archivos intercambiado. Es
+    // inevitable y está bien, pero no puede pasar en silencio.
+    const pedido = formatearGrupos(resultado.grupos);
+    const dibujado = formatearGrupos(estado.grupos());
+    if (pedido !== dibujado) {
+      aviso(`Los grupos se reordenaron para poder dibujarlos: ahora son «${dibujado}».`);
+    }
+
     abierta = true;
     vista.hidden = false;
     campoGrupos.readOnly = true;
@@ -368,8 +434,9 @@
     if (resumen) resumen.textContent = 'Cargando las páginas…';
 
     try {
-      await cargarDocumento(item._fileObj);
+      if (!await cargarDocumento(item._fileObj, mia)) return;   // ya no es esta apertura
     } catch (err) {
+      if (!vigente(mia)) return;
       archivo = null;
       documento = null;
       cerrar(true);
@@ -378,7 +445,15 @@
         : 'No se pudieron dibujar las páginas de este PDF');
       return;
     }
-    if (!abierta) return;   // se cerró mientras cargaba
+    if (!vigente(mia) || !abierta) return;
+
+    // El total viene de /api/paginas y el documento de PDF.js: si no coinciden,
+    // el usuario estaría eligiendo cortes sobre un PDF que no es el que se midió.
+    if (documento.numPages !== estado.total) {
+      cerrar(true);
+      aviso('El PDF que se ve no coincide con el que se midió; vuelve a subirlo');
+      return;
+    }
     refrescar(null);
   }
 

@@ -396,3 +396,30 @@ def test_panel_division_ofrece_los_seis_modos(client):
     assert 'id="div-paginas-por-archivo"' in html and 'value="2"' in html
     assert 'id="div-grupos"' in html and 'id="div-rellenar"' in html
     assert re.search(r'/static/js/grupos\.js\?v=\d+', html)
+
+
+def test_grupos_js_se_carga_antes_de_main_js(client):
+    # main.js llama a analizarGrupos/gruposPorBloques al cargar; invertir el orden
+    # deja la pestaña Dividir muerta sin que falle ninguna otra prueba.
+    html = client.get('/').get_data(as_text=True)
+    assert html.index('grupos.js') < html.index('main.js')
+
+
+def test_vista_de_paginas_recibe_las_rutas_de_pdfjs(client):
+    # vista-paginas.js no puede usar url_for: las rutas llegan por data-… con su ?v=
+    html = client.get('/').get_data(as_text=True)
+    m = re.search(r'id="div-vista"[^>]*data-pdfjs="(/static/pdfjs/build/pdf\.mjs\?v=\d+)"'
+                  r'[^>]*data-worker="(/static/pdfjs/build/pdf\.worker\.mjs\?v=\d+)"', html)
+    assert m
+    for ruta in m.groups():
+        r = client.get(ruta)
+        assert r.status_code == 200 and r.mimetype == 'text/javascript'
+        r.close()
+    assert re.search(r'/static/js/vista-paginas\.js\?v=\d+', html)
+
+
+def test_el_boton_de_ver_paginas_esta_disponible(client):
+    # Nace con hidden en la Tarea 4 porque la vista no existía; ahora debe estar visible.
+    html = client.get('/').get_data(as_text=True)
+    m = re.search(r'<button[^>]*id="div-ver-paginas"[^>]*>', html)
+    assert m and 'hidden' not in m.group(0)

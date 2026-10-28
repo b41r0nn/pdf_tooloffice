@@ -216,7 +216,20 @@
             <button type="button" class="btn-secondary" id="div-rellenar">Rellenar cada N páginas</button>
           </div>
           <p class="form-hint" id="div-grupos-cuenta" aria-live="polite"></p>
-          <button type="button" class="btn-secondary" id="div-ver-paginas" hidden>Ver páginas</button>
+          <button type="button" class="btn-secondary" id="div-ver-paginas" aria-expanded="false" aria-controls="div-vista">Ver páginas</button>
+
+          <div id="div-vista" class="vista-paginas" hidden
+               data-pdfjs="{{ url_for('static', filename='pdfjs/build/pdf.mjs') }}"
+               data-worker="{{ url_for('static', filename='pdfjs/build/pdf.worker.mjs') }}">
+            <div class="vista-barra">
+              <span id="vista-resumen" role="status"></span>
+              <label class="form-label" for="vista-n">Reagrupar cada</label>
+              <input type="number" class="form-input" id="vista-n" min="1" value="2" inputmode="numeric">
+              <button type="button" class="btn-secondary" id="vista-reagrupar">Reagrupar</button>
+              <button type="button" class="btn-secondary" id="vista-cerrar">Cerrar</button>
+            </div>
+            <div id="vista-grupos"></div>
+          </div>
         </div>
       </li>
     </ol>
@@ -574,5 +587,6 @@
 <script src="{{ url_for('static', filename='js/grupos.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+<script src="{{ url_for('static', filename='js/vista-paginas.js') }}"></script>
 </body>
 </html>

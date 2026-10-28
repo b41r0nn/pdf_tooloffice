@@ -510,6 +510,118 @@ body.modo-ancho { --ancho-max: 1680px; }
 
 #div-ver-paginas { margin-top: 16px; }
 
+/* ── Vista de páginas: un recuadro por archivo de salida ──────────
+   Las páginas van en flex con flex-wrap para que a 320 px bajen de línea en
+   vez de desbordarse; el ancho de la miniatura lo manda el marco y el <canvas>
+   se ajusta a él (el JS solo fija los píxeles del dibujo). */
+.vista-paginas {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--borde);
+}
+
+.vista-barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+
+#vista-resumen { flex: 1 1 100%; font-weight: 800; color: var(--marca); }
+.vista-barra .form-label { margin-bottom: 0; }
+.vista-barra .form-input { width: 90px; }
+
+.vista-grupo {
+  border: 1px solid var(--marca);
+  border-radius: var(--radio-sm);
+  padding: 10px 12px 12px;
+}
+
+.vista-grupo + .vista-grupo { margin-top: 12px; }
+
+/* Las descartadas no son un archivo: recuadro de trazo discontinuo y sin color de marca */
+.vista-fuera { border-style: dashed; border-color: var(--borde-fuerte); }
+
+.vista-grupo-cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.vista-grupo-titulo { font-size: 15px; font-weight: 800; color: var(--texto); }
+.vista-unir { padding: 6px 12px; font-size: 13px; }
+
+.vista-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.vista-pagina,
+.vista-pie {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.vista-lienzo-marco {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  min-height: 150px;
+  overflow: hidden;
+  background: #FFFFFF;
+  border: 1px solid var(--borde);
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgb(10 18 34 / 0.18);
+}
+
+.vista-lienzo { display: block; width: 100%; height: auto; }
+.vista-numero { font-size: 13px; font-weight: 700; color: var(--texto-2); }
+
+.vista-descartar,
+.vista-cortar {
+  background: transparent;
+  border: 1px solid var(--borde-fuerte);
+  border-radius: var(--radio-sm);
+  color: var(--texto);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transicion), border-color var(--transicion);
+}
+
+.vista-descartar { padding: 4px 9px; font-size: 12px; font-weight: 700; }
+
+.vista-cortar {
+  align-self: center;
+  min-width: 30px;
+  padding: 8px 4px;
+  border-style: dashed;
+  color: var(--marca);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.vista-descartar:hover,
+.vista-cortar:hover { background: var(--relleno); border-color: var(--marca); }
+
+.vista-descartar:focus-visible,
+.vista-cortar:focus-visible { outline: 2px solid var(--marca); outline-offset: 2px; }
+
+.vista-pagina.apagada .vista-lienzo-marco { opacity: 0.35; }
+.vista-pagina.apagada .vista-numero { color: var(--texto-3); text-decoration: line-through; }
+
+@media (max-width: 420px) {
+  .vista-lienzo-marco { width: 96px; min-height: 120px; }
+}
+
 .btn-secondary:focus-visible { outline: 2px solid var(--marca); outline-offset: 3px; }
 
 .form-hint { margin-top: 10px; font-size: 14px; color: var(--texto-3); }

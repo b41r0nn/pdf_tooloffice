@@ -2,8 +2,8 @@
 
 Aplicación web para manipulación de documentos PDF: unión, división, conversión, compresión, cifrado y **edición** (texto, firmas, imágenes, formularios y páginas).
 
-**Versión:** 2.3.1
-**Última actualización:** 23/10/2026
+**Versión:** 2.4.0
+**Última actualización:** 28/10/2026
 **Uso interno bajo licencia de no comercialización:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S "REDIHOS" - PROYECTO EDUCATIVO
 
 ---
@@ -12,6 +12,7 @@ Aplicación web para manipulación de documentos PDF: unión, división, convers
 
 - [Inicio rápido](#inicio-rápido)
 - [Configuración](#configuración)
+- [Dividir un PDF](#dividir-un-pdf)
 - [Editor de PDF](#editor-de-pdf)
 - [Conversión PDF → Excel / Word](#conversión-pdf--excel--word)
 - [Herramientas libres utilizadas](#herramientas-libres-utilizadas)
@@ -97,6 +98,24 @@ Si `ADMIN_PASSWORD` está vacía o es el valor de ejemplo `cambiar_esto_en_produ
 
 ---
 
+## Dividir un PDF
+
+Pestaña **Dividir**. Seis maneras de sacar páginas de un PDF:
+
+| Modo | Qué entrega |
+|---|---|
+| Un rango | Un PDF con las páginas de la *a* a la *b* |
+| Cada página por separado | Un ZIP con una página por archivo |
+| Solo las pares / solo las impares | Un PDF con esas páginas |
+| **Cada N páginas** | Un ZIP con un archivo cada N páginas (la última puede quedar más corta). Mientras se escribe N, la pantalla dice cuántos archivos saldrán |
+| **Grupos personalizados** | Un ZIP con un archivo por grupo, escrito así: `1-2,3-5,6` (páginas 1 y 2 juntas, de la 3 a la 5 juntas, la 6 sola). Se pueden dejar páginas fuera |
+
+Dentro del ZIP los archivos se llaman `nombre_01.pdf`, `nombre_02.pdf`… para renombrarlos con facilidad.
+
+**Ver páginas** (en *Grupos personalizados*): muestra una miniatura de cada página, agrupadas en recuadros, una por documento. Se ajusta con el ratón o el dedo: **cortar** un grupo en dos, **unir** un grupo con el siguiente, **descartar** una página (por ejemplo, la cara en blanco de un documento de 3 hojas escaneado a doble cara) o **reagrupar** cada N páginas. Al abrirla parte de lo que esté escrito en el campo de grupos (o de grupos parejos si está vacío), y cada cambio vuelve a escribir el texto `1-2,3-5,6`; mientras la vista está abierta ese campo queda en solo lectura. El texto también se puede escribir directamente, sin abrir la vista. Las miniaturas se dibujan en el navegador con el PDF.js que ya trae la app, sin enviar nada más al servidor.
+
+---
+
 ## Editor de PDF
 
 Pestaña **Editar PDF**. El documento se sube una vez y queda en una sesión del servidor con **versiones**: cada cambio guardado crea una versión nueva y el botón **Deshacer** vuelve a la anterior (hasta 30). La sesión se reanuda si se recarga la página y se borra sola tras `EDIT_SESSION_HOURS` sin uso o al pulsar **Cerrar**.
@@ -162,13 +181,15 @@ PDF → Word usa pdf2docx (conserva diseño); si el PDF es escaneado arma un Wor
 | Herramienta | Licencia | Uso |
 |---|---|---|
 | [PDF.js](https://github.com/mozilla/pdf.js) 6.4.299 (Mozilla) | Apache-2.0 | Visor y editor en el navegador (`app/static/pdfjs`, build *legacy* para navegadores no actualizados) |
-| [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | AGPL-3.0 | Motor PDF del servidor (unión, división, texto, tablas con bordes, compresión, cifrado, aplanado) |
+| [PyMuPDF](https://github.com/pymupdf/PyMuPDF) | AGPL-3.0 | Motor PDF del servidor (unión, división en bloques y grupos, texto, tablas con bordes, compresión, cifrado, aplanado) |
 | [Camelot](https://github.com/camelot-dev/camelot) 2 | MIT | Tablas sin bordes y escaneadas en PDF → Excel |
 | [Tesseract OCR](https://github.com/tesseract-ocr/tesseract) (español/inglés) | Apache-2.0 | Lectura de PDF escaneados (vía MuPDF) |
 | [LibreOffice](https://www.libreoffice.org/) (opcional) | MPL-2.0 | Word/Excel → PDF con fidelidad completa |
 | Liberation, Carlito, Caladea, DejaVu | OFL y licencias libres | Fuentes métricamente compatibles en Docker/Linux |
 | [Bricolage Grotesque](https://github.com/ateliertriay/bricolage), [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) | OFL-1.1 | Tipografías de la interfaz, servidas desde `app/static/fonts` (no dependen de internet) |
 | pdf2docx, python-docx, openpyxl, reportlab, Pillow, OpenCV | MIT/MIT/MIT/BSD/HPND/Apache-2.0 | Conversiones |
+
+> La división en bloques (v2.4.0) no añadió ninguna dependencia: usa PyMuPDF, el PDF.js que ya viene incluido (miniaturas) y `zipfile` de la biblioteca estándar de Python.
 
 > PyMuPDF es AGPL: para uso interno no hay obligación adicional; si la app se ofreciera a terceros por red habría que publicar su código fuente.
 
@@ -192,12 +213,14 @@ pdf_tooloffice/
 │   ├── database.py          # Logs SQLite
 │   ├── cleanup.py           # Limpieza periódica (cada hora)
 │   ├── templates/index.html
-│   ├── static/css, static/js (main.js, editor.js), static/pdfjs (PDF.js)
+│   ├── static/css, static/pdfjs (PDF.js)
+│   ├── static/js            # main.js, editor.js, grupos.js (lee y valida «1-2,3-5,6»), vista-paginas.js (miniaturas y cortes de Dividir)
 │   ├── static/icons         # favicon.ico, icon.svg, apple-touch-icon, íconos 192/512 y manifiesto
 │   ├── static/fonts         # tipografías libres de la interfaz (OFL)
 │   ├── requirements.txt / requirements-dev.txt
 │   └── Dockerfile
-├── tests/                   # pytest (105 pruebas; OCR/Camelot solo dentro de Docker)
+├── tests/                   # pytest (159 pruebas; 3 de OCR/Camelot solo corren dentro de Docker)
+│   ├── test_division.py, test_grupos_js.py, test_vista_paginas_js.py   # Dividir: servidor y los dos scripts del navegador
 └── legacy/                  # versión anterior (no se usa)
 ```
 
@@ -212,7 +235,7 @@ pdf_tooloffice/
 | `/favicon.ico` | GET | Ícono (también en `static/icons`) |
 | `/api/paginas` | POST | Número de páginas |
 | `/api/union` | POST | Unir PDFs (`archivos[]`, `nombre_salida`, `comprimir`, `nivel`) |
-| `/api/division` | POST | Dividir (`modo`: rango/todas/pares/impares, `inicio`, `fin`) |
+| `/api/division` | POST | Dividir (`modo`: rango/todas/pares/impares con `inicio`, `fin`; `cada` con `paginas_por_archivo`; `personalizado` con `grupos`, p. ej. `1-2,3-5,6`) |
 | `/api/conversion` | POST | `direccion`: pdf-docx, pdf-xlsx, docx-pdf, xlsx-pdf, pdf_a_jpg, imagen_a_pdf |
 | `/api/compresion` | POST | `nivel`: baja/media/alta/ultra |
 | `/api/cifrado` | POST | Cifrado AES-256 (`contrasena`, `confirmar`) |
@@ -274,7 +297,7 @@ pip install -r app/requirements-dev.txt
 python -m pytest
 ```
 
-Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de archivo, páginas que comparten fuente), sesiones (versiones, bloqueo, traversal, expiración), todas las operaciones y la seguridad del panel admin.
+Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de archivo, páginas que comparten fuente), la división en bloques y grupos (incluidos los scripts del navegador, que se prueban con Node cuando está instalado), sesiones (versiones, bloqueo, traversal, expiración), todas las operaciones y la seguridad del panel admin.
 
 ---
 
@@ -292,6 +315,17 @@ Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de ar
 ---
 
 ## Changelog
+
+### v2.4.0 — 28 Octubre 2026
+
+**Dividir un escaneo de muchos documentos en un solo paso**
+- El problema: la impresora de la oficina separa sola una tanda continua en un archivo por documento, pero pierde esa ventaja cuando las hojas son a doble cara. Por eso había que escanear los documentos de uno en uno (50 facturas, 50 escaneos). Ahora se escanean los 50 de corrido en un solo PDF de unas 100 páginas y se corta aquí en 50 archivos.
+- **Cada N páginas**: si todos los documentos tienen el mismo largo, se indica N y sale un ZIP con un archivo cada N páginas. La pantalla avisa cuántos archivos saldrán antes de empezar.
+- **Grupos personalizados**: para documentos de largos distintos. Se escribe, por ejemplo, `1-2,3-5,6` (el primero con las páginas 1 y 2, el segundo con la 3 a la 5, el tercero con la 6) y sale un ZIP con un archivo por grupo. El texto se puede escribir directamente; el botón *Rellenar cada N páginas* lo llena solo como punto de partida.
+- **Ver páginas**: muestra las páginas como miniaturas, en un recuadro por documento, para comprobar a simple vista dónde empieza y termina cada uno. Ahí mismo se corrige con un clic: *cortar* un documento en dos, *unir* uno con el siguiente, *descartar* una página (la cara en blanco de un documento de 3 hojas escaneado a doble cara, por ejemplo) o *reagrupar* todo cada N páginas. El texto de grupos se escribe solo con cada cambio. Con 100 páginas abre al instante: solo dibuja las miniaturas que se están viendo.
+- Los archivos del ZIP se llaman `nombre_01.pdf`, `nombre_02.pdf`… para renombrarlos con el número de factura.
+- Verificado de 320 a 1440 px de ancho (celular a monitor) sin desbordes, con la vista abierta y cerrada.
+- Sin dependencias nuevas: usa PyMuPDF, el PDF.js ya incluido y `zipfile` de Python. Los modos de antes (rango, cada página, pares, impares) no cambian.
 
 ### v2.3.1 — 23 Octubre 2026
 

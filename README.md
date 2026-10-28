@@ -110,9 +110,11 @@ Pestaña **Dividir**. Seis maneras de sacar páginas de un PDF:
 | **Cada N páginas** | Un ZIP con un archivo cada N páginas (la última puede quedar más corta). Mientras se escribe N, la pantalla dice cuántos archivos saldrán |
 | **Grupos personalizados** | Un ZIP con un archivo por grupo, escrito así: `1-2,3-5,6` (páginas 1 y 2 juntas, de la 3 a la 5 juntas, la 6 sola). Se pueden dejar páginas fuera |
 
-Dentro del ZIP los archivos se llaman `nombre_01.pdf`, `nombre_02.pdf`… para renombrarlos con facilidad.
+Nombres dentro del ZIP: en *Cada N páginas* y *Grupos personalizados* son `nombre_01.pdf`, `nombre_02.pdf`… (el número sigue el orden de los grupos), para renombrarlos con facilidad; en *Cada página por separado* son `pagina_01.pdf`, `pagina_02.pdf`… (con tantos ceros como necesite el total de páginas).
 
-**Ver páginas** (en *Grupos personalizados*): muestra una miniatura de cada página, agrupadas en recuadros, una por documento. Se ajusta con el ratón o el dedo: **cortar** un grupo en dos, **unir** un grupo con el siguiente, **descartar** una página (por ejemplo, la cara en blanco de un documento de 3 hojas escaneado a doble cara) o **reagrupar** cada N páginas. Al abrirla parte de lo que esté escrito en el campo de grupos (o de grupos parejos si está vacío), y cada cambio vuelve a escribir el texto `1-2,3-5,6`; mientras la vista está abierta ese campo queda en solo lectura. El texto también se puede escribir directamente, sin abrir la vista. Las miniaturas se dibujan en el navegador con el PDF.js que ya trae la app, sin enviar nada más al servidor.
+*Cada N páginas* y *Grupos personalizados* entregan como máximo 500 archivos por división; pasado ese tope la pantalla lo avisa y sugiere *Cada página por separado*.
+
+**Ver páginas** (en *Grupos personalizados*): muestra una miniatura de cada página, agrupadas en recuadros, una por documento. Se ajusta con el ratón o el dedo: **cortar** un grupo en dos, **unir** un grupo con el siguiente, **descartar** una página (por ejemplo, la cara en blanco de un documento de 3 hojas escaneado a doble cara) o **reagrupar** cada N páginas. Al abrirla parte de lo que esté escrito en el campo de grupos (o de grupos parejos si está vacío), y cada cambio vuelve a escribir el texto `1-2,3-5,6`; mientras la vista está abierta ese campo queda en solo lectura. Si los grupos escritos estaban en otro orden (por ejemplo `6-7,1-2`), la vista los ordena por página (`1-2,6-7`) y lo avisa: son los mismos archivos, pero cambia cuál es el `_01` y cuál el `_02`, es decir, qué páginas acaban en qué archivo. El texto también se puede escribir directamente, sin abrir la vista. Las miniaturas se dibujan en el navegador con el PDF.js que ya trae la app, sin enviar nada más al servidor.
 
 ---
 

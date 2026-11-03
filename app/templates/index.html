@@ -300,15 +300,23 @@
       <li class="card paso">
         <h2 class="paso-titulo">Elige el archivo</h2>
         <div class="upload-zone" id="conversion-upload-zone">
-          <input type="file" accept=".pdf,.xlsx,.docx" id="conversion-file-input" aria-label="Elegir el archivo a convertir">
+          <input type="file" accept=".pdf,.xlsx,.docx" id="conversion-file-input" multiple aria-label="Elegir los archivos a convertir">
           <span class="upload-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
           </span>
-          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
-          <p class="upload-sub"><span id="conversion-upload-sub">PDF, Excel (.xlsx) o Word (.docx)</span>. Hasta 50 MB.</p>
+          <p class="upload-title">Arrastra los archivos aquí o haz clic para buscarlos</p>
+          <p class="upload-sub"><span id="conversion-upload-sub">PDF, Excel (.xlsx) o Word (.docx)</span>. Puedes elegir varios a la vez: hasta 50 MB cada uno y 100 MB entre todos.</p>
         </div>
         <div class="file-list"></div>
       </li>
+      <li class="card paso">
+        <h2 class="paso-titulo">¿Todo en un ZIP? <span class="opcional">opcional</span></h2>
+        <label class="check" for="conv-zip">
+          <input type="checkbox" id="conv-zip"> Entregar todo en un solo ZIP
+        </label>
+        <p class="form-hint">Sin marcar, cada archivo se descarga por separado. Marcada, llega un ZIP listo para adjuntar al correo; si pasa de 25 MB se parte en varios para que no rebote.</p>
+      </li>
+
     </ol>
 
     <div class="action-bar">
@@ -347,12 +355,12 @@
       <li class="card paso">
         <h2 class="paso-titulo">Elige el PDF</h2>
         <div class="upload-zone">
-          <input type="file" accept=".pdf" aria-label="Elegir el PDF a comprimir">
+          <input type="file" accept=".pdf" multiple aria-label="Elegir los PDF a comprimir">
           <span class="upload-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
           </span>
-          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
-          <p class="upload-sub">Un PDF de hasta 50 MB</p>
+          <p class="upload-title">Arrastra los archivos aquí o haz clic para buscarlos</p>
+          <p class="upload-sub">Puedes elegir varios a la vez. Hasta 50 MB cada uno y 100 MB entre todos.</p>
         </div>
         <div class="file-list"></div>
       </li>
@@ -378,6 +386,14 @@
           </div>
         </div>
       </li>
+      <li class="card paso">
+        <h2 class="paso-titulo">¿Todo en un ZIP? <span class="opcional">opcional</span></h2>
+        <label class="check" for="comp-zip">
+          <input type="checkbox" id="comp-zip"> Entregar todo en un solo ZIP
+        </label>
+        <p class="form-hint">Sin marcar, cada archivo se descarga por separado. Marcada, llega un ZIP listo para adjuntar al correo; si pasa de 25 MB se parte en varios para que no rebote.</p>
+      </li>
+
     </ol>
 
     <div class="action-bar">
@@ -416,12 +432,12 @@
       <li class="card paso">
         <h2 class="paso-titulo">Elige el PDF</h2>
         <div class="upload-zone">
-          <input type="file" accept=".pdf" aria-label="Elegir el PDF a proteger">
+          <input type="file" accept=".pdf" multiple aria-label="Elegir los PDF a proteger">
           <span class="upload-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="9 14 12 11 15 14"/><line x1="12" y1="11" x2="12" y2="18"/></svg>
           </span>
-          <p class="upload-title">Arrastra el archivo aquí o haz clic para buscarlo</p>
-          <p class="upload-sub">Un PDF de hasta 50 MB</p>
+          <p class="upload-title">Arrastra los archivos aquí o haz clic para buscarlos</p>
+          <p class="upload-sub">Puedes elegir varios a la vez. Hasta 50 MB cada uno y 100 MB entre todos.</p>
         </div>
         <div class="file-list"></div>
       </li>
@@ -450,6 +466,14 @@
         </div>
         <p class="form-hint">Guárdala en un lugar seguro: si se pierde, el PDF no se puede abrir.</p>
       </li>
+      <li class="card paso">
+        <h2 class="paso-titulo">¿Todo en un ZIP? <span class="opcional">opcional</span></h2>
+        <label class="check" for="cif-zip">
+          <input type="checkbox" id="cif-zip"> Entregar todo en un solo ZIP
+        </label>
+        <p class="form-hint">Sin marcar, cada archivo se descarga por separado. Marcada, llega un ZIP listo para adjuntar al correo; si pasa de 25 MB se parte en varios para que no rebote.</p>
+      </li>
+
     </ol>
 
     <div class="action-bar">
@@ -585,6 +609,7 @@
 </footer>
 
 <script src="{{ url_for('static', filename='js/grupos.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tandas.js') }}"></script>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 <script src="{{ url_for('static', filename='js/editor.js') }}"></script>
 <script src="{{ url_for('static', filename='js/vista-paginas.js') }}"></script>

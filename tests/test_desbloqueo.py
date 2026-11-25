@@ -11,7 +11,7 @@ from app.database import obtener_logs
 
 CLAVE = 'clave-de-prueba-2026'
 MENSAJE_RESTRICCIONES = (
-    'Este PDF se abre sin contraseña pero no deja imprimir ni copiar. '
+    'Este PDF se abre sin contraseña pero tiene restricciones (imprimir, copiar o editar). '
     'Marca «Quitar también las restricciones» para quitárselas.'
 )
 
@@ -233,6 +233,12 @@ def test_comprobacion_rechaza_resultado_con_distinto_numero_de_paginas():
             services._comprobar_desbloqueo(pdf_sin_cifrar(paginas=1), doc_original)
 
 
+def test_comprobacion_rechaza_resultado_que_no_se_puede_reabrir():
+    with fitz.open(stream=pdf_sin_cifrar(), filetype='pdf') as doc_original:
+        with pytest.raises(ValueError, match='no coincide'):
+            services._comprobar_desbloqueo(b'esto no es un pdf', doc_original)
+
+
 def test_comprobacion_rechaza_texto_distinto_en_una_pagina():
     original = _pdf_con_textos(['Pagina 1 del documento', 'Pagina 2 del documento'])
     alterado = _pdf_con_textos(['Pagina 1 del documento', 'Pagina 2 alterada'])
@@ -293,6 +299,15 @@ def test_desbloqueo_con_contrasena_mala_da_400_con_mensaje_claro(client):
     assert r.status_code == 400
     assert 'contraseña' in r.get_json()['error']
     assert CLAVE_MALA not in r.get_data(as_text=True)
+
+
+def test_desbloqueo_con_contrasena_vacia_en_un_pdf_que_la_pide_da_400(client):
+    # El caso más probable del primer día: se sube el PDF y se olvida escribir la contraseña
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                             'contrasena': ''})
+
+    assert r.status_code == 400
+    assert 'contraseña' in r.get_json()['error']
 
 
 def test_desbloqueo_sin_archivo_da_400(client):
@@ -369,8 +384,16 @@ def test_el_detalle_registra_la_casilla_pedida_no_el_resultado(client, app):
     assert 'quitar restricciones' not in fila['detalle']
 
 
+def _comprobar_que_caplog_ve_app_routes(caplog):
+    # Control positivo: sin esto, las pruebas de abajo pasarían vacías si el logger de
+    # las rutas no llegara a caplog.
+    logging.getLogger('app.routes').info('control-positivo-caplog')
+    assert 'control-positivo-caplog' in caplog.text
+
+
 def test_la_contrasena_no_aparece_en_los_registros_de_python_en_exito(client, caplog):
     caplog.set_level(logging.DEBUG)
+    _comprobar_que_caplog_ve_app_routes(caplog)
 
     r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
                                              'contrasena': CLAVE})
@@ -381,6 +404,7 @@ def test_la_contrasena_no_aparece_en_los_registros_de_python_en_exito(client, ca
 
 def test_la_contrasena_no_aparece_en_los_registros_de_python_en_fallo(client, caplog):
     caplog.set_level(logging.DEBUG)
+    _comprobar_que_caplog_ve_app_routes(caplog)
 
     r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
                                              'contrasena': CLAVE_MALA})

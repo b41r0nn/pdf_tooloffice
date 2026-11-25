@@ -130,3 +130,33 @@ def test_el_javascript_pone_la_etiqueta_de_quitar(client):
         js = f.read()
     assert 'Quitando la contraseña…' in js
     assert "'Cifrando…'" in js
+
+
+def _js():
+    ruta = os.path.join(os.path.dirname(__file__), '..', 'app', 'static', 'js', 'main.js')
+    with open(ruta, encoding='utf-8') as f:
+        return f.read()
+
+
+def test_el_javascript_cambia_titulo_y_descripcion_segun_el_modo():
+    js = _js()
+    for texto in ('Quitar la contraseña', 'Proteger con contraseña',
+                  'Devuelve un PDF nuevo que se abre sin pedir contraseña. El original no se toca.',
+                  'Cifra el PDF: solo quien tenga la contraseña podrá abrirlo.',
+                  'Elegir los PDF a desbloquear', 'Elegir los PDF a proteger'):
+        assert texto in js, texto
+
+
+def test_al_cambiar_de_modo_se_esconde_el_resultado_anterior():
+    js = _js()
+    cuerpo = js[js.index('const sincronizarModo'):js.index("addEventListener('pageshow'")]
+    assert '.result-box' in cuerpo
+    assert "classList.remove('visible')" in cuerpo
+    assert '.btn-download' in cuerpo
+
+
+def test_la_casilla_de_restricciones_esta_asociada_a_su_explicacion(client):
+    panel = _panel(client.get('/').get_data(as_text=True), 'cifrado')
+    casilla = re.search(r'<input[^>]*id="cif-restricciones"[^>]*>', panel).group(0)
+    assert 'aria-describedby="cif-restricciones-nota"' in casilla
+    assert 'id="cif-restricciones-nota"' in panel

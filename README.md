@@ -332,6 +332,7 @@ Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de ar
 - Antes de entregar, la aplicación vuelve a abrir el resultado y comprueba que no pide contraseña, que tiene las mismas páginas y el mismo texto, y que no queda ninguna restricción. Si algo no cuadra, no entrega el archivo y avisa.
 - **Lo que NO hace**: no adivina ni prueba contraseñas. Un PDF que pide contraseña no se desbloquea sin la correcta. Tampoco toca Excel ni Word: eso necesitaría una dependencia nueva, y esa decisión es del dueño.
 - Sin dependencias nuevas: el desbloqueo usa PyMuPDF, que ya estaba.
+- Un PDF **firmado digitalmente** sale con la firma invalidada, porque el archivo se reescribe (vale para todas las herramientas de la aplicación).
 
 ### v2.5.0 — 3 Noviembre 2026
 

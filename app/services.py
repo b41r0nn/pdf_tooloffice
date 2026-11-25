@@ -771,8 +771,13 @@ PERMISOS_COMPLETOS = (
 
 
 MENSAJE_RESTRICCIONES_PDF = (
-    'Este PDF se abre sin contraseña pero no deja imprimir ni copiar. '
+    'Este PDF se abre sin contraseña pero tiene restricciones (imprimir, copiar o editar). '
     'Marca «Quitar también las restricciones» para quitárselas.'
+)
+
+MENSAJE_NO_COINCIDE = (
+    'El PDF se desbloqueó pero el resultado no coincide con el original, así que no se entrega. '
+    'Avisa a Sistemas con el nombre del archivo.'
 )
 
 
@@ -790,7 +795,12 @@ def _comprobar_desbloqueo(datos, doc_original):
     (se guarda sin cifrar, así que siempre debe salir libre), mismas páginas y mismo texto.
     Si falla, es un defecto nuestro: se registra (sin contenido del PDF) y se avisa.
     """
-    with fitz.open(stream=datos, filetype='pdf') as resultado:
+    try:
+        resultado = fitz.open(stream=datos, filetype='pdf')
+    except Exception:
+        log.exception('Desbloqueo descartado: no se pudo reabrir el resultado')
+        raise ValueError(MENSAJE_NO_COINCIDE) from None
+    with resultado:
         paginas_ok = resultado.page_count == doc_original.page_count
         texto_ok = paginas_ok and all(
             pagina_nueva.get_text() == pagina_original.get_text()
@@ -805,10 +815,7 @@ def _comprobar_desbloqueo(datos, doc_original):
         'sin contraseña y sin restricciones: %s',
         paginas_esperadas, paginas_obtenidas, texto_ok, libre,
     )
-    raise ValueError(
-        'El PDF se desbloqueó pero el resultado no coincide con el original, así que no se entrega. '
-        'Avisa a Sistemas con el nombre del archivo.'
-    )
+    raise ValueError(MENSAJE_NO_COINCIDE)
 
 
 def desbloquear_pdf(ruta_pdf, contrasena='', quitar_restricciones=False):

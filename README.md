@@ -2,8 +2,8 @@
 
 Aplicación web para manipulación de documentos PDF: unión, división, conversión, compresión, cifrado y **edición** (texto, firmas, imágenes, formularios y páginas).
 
-**Versión:** 2.5.0
-**Última actualización:** 03/11/2026
+**Versión:** 2.6.0
+**Última actualización:** 25/11/2026
 **Uso interno bajo licencia de no comercialización:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S "REDIHOS" - PROYECTO EDUCATIVO
 
 ---
@@ -206,7 +206,7 @@ pdf_tooloffice/
 ├── .env                     # Configuración (no versionar)
 ├── app/
 │   ├── __init__.py          # Factory Flask, cabeceras de seguridad, límites
-│   ├── routes.py            # Endpoints de unión, división, conversión, compresión, cifrado, admin
+│   ├── routes.py            # Endpoints de unión, división, conversión, compresión, cifrado, desbloqueo, admin
 │   ├── routes_edicion.py    # API del editor (/api/edicion)
 │   ├── services.py          # Procesamiento PDF / Office
 │   ├── conversion_excel.py  # PDF → Excel (tablas, datos, OCR) y base del PDF → Word escaneado
@@ -221,9 +221,10 @@ pdf_tooloffice/
 │   ├── static/fonts         # tipografías libres de la interfaz (OFL)
 │   ├── requirements.txt / requirements-dev.txt
 │   └── Dockerfile
-├── tests/                   # pytest (159 pruebas; 3 de OCR/Camelot solo corren dentro de Docker)
+├── tests/                   # pytest (244 pruebas; 3 de OCR/Camelot solo corren dentro de Docker)
 │   ├── test_division.py, test_grupos_js.py, test_vista_paginas_js.py   # Dividir: servidor y los dos scripts del navegador
 │   ├── test_empaquetar.py, test_tandas_js.py, test_tandas_ui.py        # Tandas: ZIP del servidor, reparto en el navegador y la casilla
+│   ├── test_desbloqueo.py, test_desbloqueo_ui.py                       # Quitar contraseña: servidor y pantalla
 └── legacy/                  # versión anterior (no se usa)
 ```
 
@@ -242,6 +243,7 @@ pdf_tooloffice/
 | `/api/conversion` | POST | `direccion`: pdf-docx, pdf-xlsx, docx-pdf, xlsx-pdf, pdf_a_jpg, imagen_a_pdf |
 | `/api/compresion` | POST | `nivel`: baja/media/alta/ultra |
 | `/api/cifrado` | POST | Cifrado AES-256 (`contrasena`, `confirmar`) |
+| `/api/desbloqueo` | POST | Quita la contraseña de un PDF (`archivo`, `contrasena` si la pide, `quitar_restricciones`=`true` para quitar también las de imprimir y copiar). Salida `<nombre>_sin_contrasena.pdf` |
 | `/api/empaquetar` | POST | ZIP con los resultados de una tanda (`archivos[]` PDF/XLSX/DOCX, `nombre` del ZIP). No recomprime: el peso del ZIP es el de su contenido |
 | `/api/edicion` | POST | Crea sesión de edición (`archivo`, `contrasena` opcional) |
 | `/api/edicion/<id>` | GET / DELETE | Info / cerrar sesión |
@@ -301,7 +303,7 @@ pip install -r app/requirements-dev.txt
 python -m pytest
 ```
 
-Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de archivo, páginas que comparten fuente), la división en bloques y grupos, las tandas de varios archivos (el ZIP del servidor, el reparto por el tope del correo y la casilla en la pantalla), sesiones (versiones, bloqueo, traversal, expiración), todas las operaciones y la seguridad del panel admin. Los scripts del navegador se prueban con Node cuando está instalado.
+Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de archivo, páginas que comparten fuente), la división en bloques y grupos, el desbloqueo de PDF, las tandas de varios archivos (el ZIP del servidor, el reparto por el tope del correo y la casilla en la pantalla), sesiones (versiones, bloqueo, traversal, expiración), todas las operaciones y la seguridad del panel admin. Los scripts del navegador se prueban con Node cuando está instalado.
 
 ---
 
@@ -319,6 +321,18 @@ Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de ar
 ---
 
 ## Changelog
+
+### v2.6.0 — 25 Noviembre 2026
+
+**Quitar la contraseña de un PDF propio**
+- El caso real: un PDF propio llega cifrado, se conoce la contraseña y hay que dejarlo listo para trabajar con él, sin pedirla cada vez.
+- **Proteger tiene dos modos**: *Poner contraseña* (como siempre) y *Quitar contraseña*. En el segundo se sube el PDF, se escribe su contraseña actual y se descarga un PDF nuevo, `<nombre>_sin_contrasena.pdf`, sin cifrado y sin restricciones. **El original no se toca.**
+- Si el PDF se abre sin pedir contraseña pero tiene restricciones (imprimir, copiar o editar), la casilla **«Quitar también las restricciones de impresión y copia»** se las quita. Sin la casilla, esas restricciones se respetan.
+- Funciona con varios archivos a la vez y con la casilla del ZIP, como el resto de la aplicación. La contraseña nunca se escribe en el registro de actividad.
+- Antes de entregar, la aplicación vuelve a abrir el resultado y comprueba que no pide contraseña, que tiene las mismas páginas y el mismo texto, y que no queda ninguna restricción. Si algo no cuadra, no entrega el archivo y avisa.
+- **Lo que NO hace**: no adivina ni prueba contraseñas. Un PDF que pide contraseña no se desbloquea sin la correcta. Tampoco toca Excel ni Word: eso necesitaría una dependencia nueva, y esa decisión es del dueño.
+- Sin dependencias nuevas: el desbloqueo usa PyMuPDF, que ya estaba.
+- Un PDF **firmado digitalmente** sale con la firma invalidada, porque el archivo se reescribe (vale para todas las herramientas de la aplicación).
 
 ### v2.5.0 — 3 Noviembre 2026
 

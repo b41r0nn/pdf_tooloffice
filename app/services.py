@@ -760,6 +760,89 @@ def cifrar_pdf(ruta_pdf, contrasena):
         )
 
 
+# ── Desbloqueo ────────────────────────────────────────────────────
+
+# OR de los 8 permisos: un PDF con todos ellos no tiene restricciones.
+PERMISOS_COMPLETOS = (
+    fitz.PDF_PERM_PRINT | fitz.PDF_PERM_MODIFY | fitz.PDF_PERM_COPY | fitz.PDF_PERM_ANNOTATE
+    | fitz.PDF_PERM_FORM | fitz.PDF_PERM_ACCESSIBILITY | fitz.PDF_PERM_ASSEMBLE
+    | fitz.PDF_PERM_PRINT_HQ
+)
+
+
+MENSAJE_RESTRICCIONES_PDF = (
+    'Este PDF se abre sin contraseña pero tiene restricciones (imprimir, copiar o editar). '
+    'Marca «Quitar también las restricciones» para quitárselas.'
+)
+
+MENSAJE_NO_COINCIDE = (
+    'El PDF se desbloqueó pero el resultado no coincide con el original, así que no se entrega. '
+    'Avisa a Sistemas con el nombre del archivo.'
+)
+
+
+def tiene_restricciones(doc):
+    """
+    True si el PDF limita imprimir, copiar o editar, aunque se abra sin contraseña.
+    No sirve doc.is_encrypted: un PDF con solo contraseña de dueño da is_encrypted=False.
+    """
+    return (doc.permissions & PERMISOS_COMPLETOS) != PERMISOS_COMPLETOS
+
+
+def _comprobar_desbloqueo(datos, doc_original):
+    """
+    Reabre el resultado y exige lo mismo que el original: sin contraseña, sin restricciones
+    (se guarda sin cifrar, así que siempre debe salir libre), mismas páginas y mismo texto.
+    Si falla, es un defecto nuestro: se registra (sin contenido del PDF) y se avisa.
+    """
+    try:
+        resultado = fitz.open(stream=datos, filetype='pdf')
+    except Exception:
+        log.exception('Desbloqueo descartado: no se pudo reabrir el resultado')
+        raise ValueError(MENSAJE_NO_COINCIDE) from None
+    with resultado:
+        paginas_ok = resultado.page_count == doc_original.page_count
+        texto_ok = paginas_ok and all(
+            pagina_nueva.get_text() == pagina_original.get_text()
+            for pagina_nueva, pagina_original in zip(resultado, doc_original)
+        )
+        libre = resultado.needs_pass == 0 and not tiene_restricciones(resultado)
+        paginas_esperadas, paginas_obtenidas = doc_original.page_count, resultado.page_count
+    if paginas_ok and texto_ok and libre:
+        return
+    log.error(
+        'Desbloqueo descartado: páginas esperadas %d, obtenidas %d; texto igual: %s; '
+        'sin contraseña y sin restricciones: %s',
+        paginas_esperadas, paginas_obtenidas, texto_ok, libre,
+    )
+    raise ValueError(MENSAJE_NO_COINCIDE)
+
+
+def desbloquear_pdf(ruta_pdf, contrasena='', quitar_restricciones=False):
+    """
+    Devuelve los bytes del PDF sin contraseña (y, si se pide, sin restricciones).
+    Guarda sin cifrar y sin comprimir: el objetivo es que el contenido quede idéntico.
+    """
+    es_valido, msg_error = validar_pdf(ruta_pdf)
+    if not es_valido:
+        raise ValueError(msg_error)
+
+    with fitz.open(ruta_pdf) as doc:
+        if doc.needs_pass:
+            if not doc.authenticate(contrasena):
+                raise ValueError(
+                    'La contraseña no es correcta. Escribe la contraseña con la que se abre este PDF.'
+                )
+        elif not tiene_restricciones(doc):
+            raise ValueError('Este PDF no tiene contraseña ni restricciones: no hay nada que quitar.')
+        elif not quitar_restricciones:
+            raise ValueError(MENSAJE_RESTRICCIONES_PDF)
+
+        datos = doc.tobytes(encryption=fitz.PDF_ENCRYPT_NONE)
+        _comprobar_desbloqueo(datos, doc)
+    return datos
+
+
 # ── Aplanado ──────────────────────────────────────────────────────
 
 def aplanar_pdf(ruta_pdf):

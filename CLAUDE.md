@@ -21,7 +21,7 @@ El `README.md` explica qué hace la aplicación. Este archivo explica cómo trab
   IA en commits ni en PR. Regla permanente del dueño.
 - **Finales de línea LF**, forzado en `.gitattributes`. El contenedor corre en Linux y con
   CRLF el Dockerfile falla.
-  Para COMPROBARLO no sirve `grep -c $''` en Git Bash: la cuenta sale igual al número
+  Para COMPROBARLO no sirve `grep -c $'\r'` en Git Bash: la cuenta sale igual al número
   de líneas (el patrón llega vacío). Usa `git ls-files --eol` o
   `python -c "b=open(f,'rb').read(); print(b.count(b'\n'))"`.
 - **Accesibilidad:** controles que son `<button>` de verdad, `aria-label` que nombra lo que
@@ -119,7 +119,9 @@ porque el servidor actúa sobre el texto. `refrescar()` es el único que escribe
 
 **PyMuPDF (cifrado de PDF)**
 - **`doc.is_encrypted` es `False` en un PDF que solo tiene contraseña de dueño**, aunque no deje imprimir ni copiar. Las restricciones se detectan comparando `doc.permissions` con `PERMISOS_COMPLETOS` (el OR de los 8 `PDF_PERM_*`, que vale 3900), nunca con `is_encrypted`.
-- **Guardar sin `encryption=` CONSERVA el cifrado** (`PDF_ENCRYPT_KEEP`). Para quitarlo hay que pasar `encryption=fitz.PDF_ENCRYPT_NONE`.
+- **Guardar un documento ya autenticado con `tobytes()` pierde el cifrado y las restricciones**, también con `encryption=fitz.PDF_ENCRYPT_KEEP` (medido en PyMuPDF 1.24.14, con contraseña de usuario y con solo contraseña de dueño).
+- Por eso `desbloquear_pdf` pasa `encryption=fitz.PDF_ENCRYPT_NONE` **de forma explícita**: no porque haga falta para que funcione, sino para dejar escrito lo que se quiere y no depender del comportamiento por omisión de una versión.
+- **Consecuencia en otras herramientas:** `_guardar()` (garbage + deflate) tampoco conserva la protección. Comprimir o unir un PDF protegido, dando su contraseña, devuelve hoy un PDF **sin** contraseña. Es comportamiento conocido y pendiente de decisión del dueño; no se ha cambiado el código.
 
 **Avisos en la pantalla**
 - **`showToast` REEMPLAZA el aviso anterior.** Un aviso dado antes del mensaje final

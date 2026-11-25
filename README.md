@@ -325,8 +325,7 @@ Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de ar
 ### v2.6.0 — 25 Noviembre 2026
 
 **Quitar la contraseña de un PDF propio**
-- El caso real: un PDF propio llega cifrado, se conoce la contraseña y hay que dejarlo listo para trabajar con él, sin pedirla cada vez. Antes había que abrirlo en otro programa para hacerlo.
-- **Proteger tiene dos modos**: *Poner contraseña* (como siempre) y *Quitar contraseña*. En el segundo se sube el PDF, se escribe su contraseña actual y se descarga un PDF nuevo, `<nombre>_sin_contrasena.pdf`, sin cifrado y sin restricciones. **El original no se toca.**
+- El caso real: un PDF propio llega cifrado, se conoce la contraseña y hay que dejarlo listo para trabajar con él, sin pedirla cada vez.- **Proteger tiene dos modos**: *Poner contraseña* (como siempre) y *Quitar contraseña*. En el segundo se sube el PDF, se escribe su contraseña actual y se descarga un PDF nuevo, `<nombre>_sin_contrasena.pdf`, sin cifrado y sin restricciones. **El original no se toca.**
 - Si el PDF se abre sin pedir contraseña pero no deja imprimir ni copiar, la casilla **«Quitar también las restricciones de impresión y copia»** se las quita. Sin la casilla, esas restricciones se respetan.
 - Funciona con varios archivos a la vez y con la casilla del ZIP, como el resto de la aplicación. La contraseña nunca se escribe en el registro de actividad.
 - Antes de entregar, la aplicación vuelve a abrir el resultado y comprueba que no pide contraseña, que tiene las mismas páginas y el mismo texto, y que no queda ninguna restricción. Si algo no cuadra, no entrega el archivo y avisa.

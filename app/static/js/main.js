@@ -682,14 +682,23 @@ document.querySelector('#panel-compresion .btn-process')?.addEventListener('clic
 // ── CIFRADO ───────────────────────────────────────────────────────
 // Dos modos en el mismo panel: poner la contraseña (/api/cifrado) o quitarla
 // (/api/desbloqueo). Sin ámbito propio: todo cuelga de los eventos, no de nombres globales.
-document.querySelectorAll('input[name="cif-modo"]').forEach(radio => {
-  radio.addEventListener('change', () => {
+// La sincronización va en una IIFE y se ejecuta al cargar y al volver a la página
+// (pageshow), para que lo que se ve siempre sea el modo que está marcado.
+(() => {
+  const sincronizarModo = () => {
     const quitar = document.getElementById('cif-modo-quitar').checked;
     document.getElementById('paso-poner').hidden  = quitar;
     document.getElementById('paso-quitar').hidden = !quitar;
     document.getElementById('cif-btn-texto').textContent = quitar ? 'Quitar contraseña' : 'Proteger PDF';
+    const etiqueta = document.querySelector('#panel-cifrado .progress-label span');
+    if (etiqueta) etiqueta.textContent = quitar ? 'Quitando la contraseña…' : 'Cifrando…';
+  };
+  document.querySelectorAll('input[name="cif-modo"]').forEach(radio => {
+    radio.addEventListener('change', sincronizarModo);
   });
-});
+  window.addEventListener('pageshow', sincronizarModo);
+  sincronizarModo();
+})();
 
 document.querySelector('#panel-cifrado .btn-process')?.addEventListener('click', () => {
   const panel = document.getElementById('panel-cifrado');

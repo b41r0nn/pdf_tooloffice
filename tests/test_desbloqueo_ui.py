@@ -6,6 +6,7 @@ viene desmarcada y las notas dicen la verdad (la contraseña puede ir vacía y l
 restricciones solo se quitan con la casilla, o se van con la contraseña).
 """
 
+import os
 import re
 
 
@@ -103,3 +104,29 @@ def test_la_casilla_del_zip_sigue_en_los_dos_modos(client):
     assert 'id="cif-zip"' in panel
     assert 'id="cif-zip"' not in _bloque(panel, 'paso-poner')
     assert 'id="cif-zip"' not in _bloque(panel, 'paso-quitar')
+
+
+def test_los_radios_de_modo_no_los_restaura_el_navegador(client):
+    # Si el navegador restaura el radio «Quitar» al recargar o volver atrás, el paso
+    # visible no coincidiría con lo que se envía. autocomplete="off" lo evita.
+    panel = _panel(client.get('/').get_data(as_text=True), 'cifrado')
+    for id_ in ('cif-modo-poner', 'cif-modo-quitar'):
+        radio = re.search(rf'<input[^>]*id="{id_}"[^>]*>', panel).group(0)
+        assert 'autocomplete="off"' in radio, id_
+
+
+def test_la_etiqueta_de_progreso_arranca_en_cifrando(client):
+    # Modo poner por defecto: la etiqueta de partida es la de cifrar. El modo quitar
+    # la cambia en el JavaScript (no en la plantilla).
+    panel = _panel(client.get('/').get_data(as_text=True), 'cifrado')
+    etiqueta = re.search(r'<div class="progress-label"><span>([^<]*)</span>', panel)
+    assert etiqueta.group(1) == 'Cifrando…'
+
+
+def test_el_javascript_pone_la_etiqueta_de_quitar(client):
+    # Guarda de texto: la conmutación en el navegador se verifica aparte.
+    ruta = os.path.join(os.path.dirname(__file__), '..', 'app', 'static', 'js', 'main.js')
+    with open(ruta, encoding='utf-8') as f:
+        js = f.read()
+    assert 'Quitando la contraseña…' in js
+    assert "'Cifrando…'" in js

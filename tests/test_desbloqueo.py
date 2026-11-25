@@ -338,3 +338,53 @@ def test_el_error_queda_en_el_log_con_el_nombre_del_archivo(client, app):
     assert fila['modulo'] == 'desbloqueo'
     assert fila['resultado'] == 'error'
     assert fila['archivo'] == 'fallo.pdf'
+
+
+def test_un_fallo_interno_da_500_generico_y_no_guarda_la_contrasena(client, app, monkeypatch):
+    def fallo(*args, **kwargs):
+        raise RuntimeError('fallo interno')
+    monkeypatch.setattr('app.routes.desbloquear_pdf', fallo)
+
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                             'contrasena': CLAVE})
+
+    assert r.status_code == 500
+    assert 'Error procesando el archivo' in r.get_json()['error']
+    assert 'fallo interno' not in r.get_data(as_text=True)
+    for fila in obtener_logs(app.config['DATABASE_PATH']):
+        for valor in fila.values():
+            assert CLAVE not in str(valor)
+
+
+def test_el_detalle_registra_la_casilla_pedida_no_el_resultado(client, app):
+    # Con contraseña y restricciones, sin casilla: el archivo sale libre, pero el detalle
+    # dice lo que se pidió (casilla no marcada), no lo que ocurrió.
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena_y_restringido()),
+                                             'contrasena': CLAVE})
+
+    assert r.status_code == 200
+    assert _libre(r.data)
+    fila = obtener_logs(app.config['DATABASE_PATH'], limit=1)[0]
+    assert 'casilla de restricciones: no' in fila['detalle']
+    assert 'quitar restricciones' not in fila['detalle']
+
+
+def test_la_contrasena_no_aparece_en_los_registros_de_python_en_exito(client, caplog):
+    caplog.set_level(logging.DEBUG)
+
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                             'contrasena': CLAVE})
+
+    assert r.status_code == 200
+    assert CLAVE not in caplog.text
+
+
+def test_la_contrasena_no_aparece_en_los_registros_de_python_en_fallo(client, caplog):
+    caplog.set_level(logging.DEBUG)
+
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                             'contrasena': CLAVE_MALA})
+
+    assert r.status_code == 400
+    assert CLAVE_MALA not in caplog.text
+    assert CLAVE_MALA not in r.get_data(as_text=True)

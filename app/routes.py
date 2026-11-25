@@ -524,10 +524,12 @@ def desbloqueo():
         quitar = request.form.get('quitar_restricciones') == 'true'
         ruta, nombre, tamano = recibir_pdf()
         resultado = desbloquear_pdf(ruta, contrasena, quitar_restricciones=quitar)
+        # Lo que se PIDIÓ, no lo que pasó: el resultado sale siempre sin restricciones
+        # (se guarda con PDF_ENCRYPT_NONE), también cuando la casilla no está marcada.
         casilla = 'sí' if quitar else 'no'
         return log_y_enviar('desbloqueo', nombre, tamano, resultado,
                             f'{nombre_base(nombre)}_sin_contrasena.pdf', MIMETYPES['pdf'],
-                            detalle=f'quitar restricciones: {casilla}; {len(resultado)} bytes')
+                            detalle=f'casilla de restricciones: {casilla}; {len(resultado)} bytes')
     except Exception as e:
         return error_response('desbloqueo', nombre, tamano, e)
     finally:

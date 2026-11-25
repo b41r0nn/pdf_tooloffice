@@ -21,10 +21,9 @@ El `README.md` explica qué hace la aplicación. Este archivo explica cómo trab
   IA en commits ni en PR. Regla permanente del dueño.
 - **Finales de línea LF**, forzado en `.gitattributes`. El contenedor corre en Linux y con
   CRLF el Dockerfile falla.
-  Para COMPROBARLO no sirve `grep -c $''` en Git Bash: la cuenta sale igual al número
+  Para COMPROBARLO no sirve `grep -c $''` en Git Bash: la cuenta sale igual al número
   de líneas (el patrón llega vacío). Usa `git ls-files --eol` o
-  `python -c "b=open(f,'rb').read(); print(b.count(b'
-'))"`.
+  `python -c "b=open(f,'rb').read(); print(b.count(b'\n'))"`.
 - **Accesibilidad:** controles que son `<button>` de verdad, `aria-label` que nombra lo que
   afecta, foco visible, contraste AA. Nada comunicado solo por color.
 - **Responsivo de 320 a 1440 px** sin desbordes horizontales. Se verifica, no se supone.
@@ -117,6 +116,10 @@ porque el servidor actúa sobre el texto. `refrescar()` es el único que escribe
   `\x85`). Hay un conjunto explícito compartido en `services.py` y `grupos.js`: van en pareja.
 - `?v=<mtime>` se añade solo a las URLs estáticas (`url_defaults` en `__init__.py`), menos
   a `fonts/`. El JS no puede escribir rutas a mano: llegan desde la plantilla en `data-…`.
+
+**PyMuPDF (cifrado de PDF)**
+- **`doc.is_encrypted` es `False` en un PDF que solo tiene contraseña de dueño**, aunque no deje imprimir ni copiar. Las restricciones se detectan comparando `doc.permissions` con `PERMISOS_COMPLETOS` (el OR de los 8 `PDF_PERM_*`, que vale 3900), nunca con `is_encrypted`.
+- **Guardar sin `encryption=` CONSERVA el cifrado** (`PDF_ENCRYPT_KEEP`). Para quitarlo hay que pasar `encryption=fitz.PDF_ENCRYPT_NONE`.
 
 **Avisos en la pantalla**
 - **`showToast` REEMPLAZA el aviso anterior.** Un aviso dado antes del mensaje final

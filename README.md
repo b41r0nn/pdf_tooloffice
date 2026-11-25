@@ -2,8 +2,8 @@
 
 Aplicación web para manipulación de documentos PDF: unión, división, conversión, compresión, cifrado y **edición** (texto, firmas, imágenes, formularios y páginas).
 
-**Versión:** 2.4.0
-**Última actualización:** 28/10/2026
+**Versión:** 2.5.0
+**Última actualización:** 03/11/2026
 **Uso interno bajo licencia de no comercialización:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S "REDIHOS" - PROYECTO EDUCATIVO
 
 ---
@@ -216,13 +216,14 @@ pdf_tooloffice/
 │   ├── cleanup.py           # Limpieza periódica (cada hora)
 │   ├── templates/index.html
 │   ├── static/css, static/pdfjs (PDF.js)
-│   ├── static/js            # main.js, editor.js, grupos.js (lee y valida «1-2,3-5,6»), vista-paginas.js (miniaturas y cortes de Dividir)
+│   ├── static/js            # main.js, editor.js, grupos.js (lee y valida «1-2,3-5,6»), vista-paginas.js (miniaturas y cortes de Dividir), tandas.js (reparto de una tanda en ZIP que caben en el correo)
 │   ├── static/icons         # favicon.ico, icon.svg, apple-touch-icon, íconos 192/512 y manifiesto
 │   ├── static/fonts         # tipografías libres de la interfaz (OFL)
 │   ├── requirements.txt / requirements-dev.txt
 │   └── Dockerfile
 ├── tests/                   # pytest (159 pruebas; 3 de OCR/Camelot solo corren dentro de Docker)
 │   ├── test_division.py, test_grupos_js.py, test_vista_paginas_js.py   # Dividir: servidor y los dos scripts del navegador
+│   ├── test_empaquetar.py, test_tandas_js.py, test_tandas_ui.py        # Tandas: ZIP del servidor, reparto en el navegador y la casilla
 └── legacy/                  # versión anterior (no se usa)
 ```
 
@@ -241,6 +242,7 @@ pdf_tooloffice/
 | `/api/conversion` | POST | `direccion`: pdf-docx, pdf-xlsx, docx-pdf, xlsx-pdf, pdf_a_jpg, imagen_a_pdf |
 | `/api/compresion` | POST | `nivel`: baja/media/alta/ultra |
 | `/api/cifrado` | POST | Cifrado AES-256 (`contrasena`, `confirmar`) |
+| `/api/empaquetar` | POST | ZIP con los resultados de una tanda (`archivos[]` PDF/XLSX/DOCX, `nombre` del ZIP). No recomprime: el peso del ZIP es el de su contenido |
 | `/api/edicion` | POST | Crea sesión de edición (`archivo`, `contrasena` opcional) |
 | `/api/edicion/<id>` | GET / DELETE | Info / cerrar sesión |
 | `/api/edicion/<id>/pdf` | GET | PDF actual |
@@ -299,7 +301,7 @@ pip install -r app/requirements-dev.txt
 python -m pytest
 ```
 
-Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de archivo, páginas que comparten fuente), la división en bloques y grupos (incluidos los scripts del navegador, que se prueban con Node cuando está instalado), sesiones (versiones, bloqueo, traversal, expiración), todas las operaciones y la seguridad del panel admin.
+Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de archivo, páginas que comparten fuente), la división en bloques y grupos, las tandas de varios archivos (el ZIP del servidor, el reparto por el tope del correo y la casilla en la pantalla), sesiones (versiones, bloqueo, traversal, expiración), todas las operaciones y la seguridad del panel admin. Los scripts del navegador se prueban con Node cuando está instalado.
 
 ---
 
@@ -317,6 +319,19 @@ Cubren edición de texto (fuente, línea base, vecinos, rotación, tamaño de ar
 ---
 
 ## Changelog
+
+### v2.5.0 — 3 Noviembre 2026
+
+**Varios archivos de una vez, y un ZIP para el correo si se quiere**
+- El problema: escanear 20 facturas y comprimirlas de una en una (subir, esperar, descargar, veinte veces) para después mandarlas al contador. Y, cuando se mandaban juntas, el correo rebotaba por peso después de todo el trabajo.
+- **Comprimir, Convertir y Proteger aceptan varios archivos**: hasta **50 MB cada uno** (como siempre) y **100 MB entre todos**. Si uno no entra, la pantalla dice cuál y por qué. *Dividir* y *Editar* siguen siendo de un archivo, porque actúan sobre un documento concreto; *Unir* ya aceptaba varios.
+- **Por defecto los resultados salen sueltos**: se procesa archivo por archivo y cada uno se descarga en cuanto está, con el avance real a la vista (*Procesando 3 de 20…*). La primera vez, el navegador pide permiso para descargar varios archivos.
+- **Casilla «Entregar todo en un solo ZIP»**, al final del panel y **desmarcada**: marcándola llega un ZIP listo para adjuntar al correo en vez de los archivos sueltos.
+- **El ZIP se parte si no cabe en el correo**: en partes de 25 MB como máximo (`facturas_parte_1.zip`, `facturas_parte_2.zip`…), que es el límite de Gmail. El ZIP no recomprime —los archivos ya vienen comprimidos—, así que su peso es el de su contenido y las partes salen exactas. Si un archivo pasa de 25 MB él solo, se entrega igual y se avisa **con su nombre**, porque es el que hará rebotar ese correo.
+- **Un archivo dañado no tumba la tanda**: los demás se procesan y al final se dice cuáles fallaron.
+- En *Convertir*, la tanda aplica a las cuatro direcciones de uno a uno (PDF ↔ Excel, PDF ↔ Word). *Varias imágenes → PDF* junta las imágenes en **un** PDF y *PDF → JPG* ya devuelve su propio ZIP, así que ahí la casilla del ZIP no aparece.
+- Verificado de 320 a 1440 px sin desbordes, y en el navegador: sueltos, en ZIP, en varias partes, con un solo archivo y con la tanda pasada de 100 MB.
+- Sin dependencias nuevas: el ZIP lo arma `zipfile` de Python.
 
 ### v2.4.0 — 28 Octubre 2026
 

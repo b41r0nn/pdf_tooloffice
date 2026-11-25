@@ -156,20 +156,26 @@ function handleFiles(zone, files) {
     // describiéndolo: el reemplazo puede ser rechazado (p. ej. por tamaño).
     if (listEl.closest('#panel-division')) olvidarTotalDivision();
   }
+  // El tope de la tanda es ENTRE TODOS, así que hay que contar lo ya elegido.
+  const elegidos = Array.from(listEl.querySelectorAll('.file-item')).map(item => item._fileObj.size);
   Array.from(files).forEach(file => {
     if (file.size > MAX_BYTES) {
       // Sin la salida, quien escanea una tanda grande se queda sin siguiente paso.
       showToast(`"${file.name}" supera el límite de ${MAX_MB} MB. Reduce su tamaño en la pestaña Comprimir.`);
       return;
     }
-    addFileItem(listEl, file);
+    if (input && input.multiple && !cabeEnLaTanda(elegidos, file.size)) {
+      showToast(`La tanda no puede pasar de ${MAX_TANDA_MB} MB entre todos. "${file.name}" ya no entra: quita alguno o procésalos en dos tandas.`);
+      return;
+    }
+    if (addFileItem(listEl, file)) elegidos.push(file.size);
     updatePreview(zone, file);
   });
 }
 
 function addFileItem(listEl, file) {
   const existing = Array.from(listEl.querySelectorAll('.file-name')).find(el => el.textContent === file.name);
-  if (existing) return;
+  if (existing) return false;
   const item = document.createElement('div');
   item.className = 'file-item';
   item._fileObj  = file;
@@ -215,6 +221,7 @@ function addFileItem(listEl, file) {
   });
 
   listEl.appendChild(item);
+  return true;
 }
 
 function togglePass(inputId, btn) {
@@ -267,6 +274,28 @@ function updatePreview(zone, file) {
 }
 
 // ── Proceso genérico con fetch ─────────────────────────────────────
+
+function nombreDeLaRespuesta(res, defecto = 'resultado') {
+  const disposition = res.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename\*?=(?:UTF-8'')?["']?([^"';\n]+)/i);
+  return match ? decodeURIComponent(match[1]) : defecto;
+}
+
+async function errorDeLaRespuesta(res) {
+  const err = await res.json().catch(() => ({ error: 'Error desconocido' }));
+  return new Error(err.error || `HTTP ${res.status}`);
+}
+
+function descargarBlob(blob, nombre) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href     = url;
+  a.download = nombre;
+  a.click();
+  // Revocar en el acto cancela la descarga en Chrome; se libera un rato después.
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
 async function procesarConFetch(panel, endpoint, buildFormData) {
   const progressWrap = panel.querySelector('.progress-wrap');
   const progressFill = panel.querySelector('.progress-fill');
@@ -347,6 +376,142 @@ function stopProgress(fill, pct) {
   clearInterval(_progressInterval);
   if (fill) fill.style.width = '100%';
   if (pct)  pct.textContent  = '100%';
+}
+
+// ── Tandas: varios archivos de una vez ─────────────────────────────
+
+/**
+ * Procesa los archivos elegidos UNO POR UNO (así cada petición sigue bajo el tope de
+ * peso del servidor) y entrega el resultado como se pidió: sueltos, o en uno o varios
+ * ZIP que caben en el correo si la casilla está marcada.
+ *
+ * @param {HTMLElement} panel
+ * @param {string} endpoint
+ * @param {(archivo: File) => FormData} formDataDe  Cómo se arma la petición de UN archivo.
+ * @param {{baseZip?: string}} opciones
+ */
+async function procesarTanda(panel, endpoint, formDataDe, { baseZip = 'archivos' } = {}) {
+  const items      = Array.from(panel.querySelectorAll('.file-item'));
+  const casillaZip = panel.querySelector('input[type="checkbox"][id$="-zip"]');
+  const pasoZip    = casillaZip && casillaZip.closest('.paso');
+  // En Convertir la casilla se esconde en las direcciones que ya devuelven un solo
+  // archivo o un ZIP propio: escondida no cuenta, aunque quedara marcada antes.
+  const enZip = !!(casillaZip && casillaZip.checked && pasoZip && !pasoZip.hidden);
+
+  // Un archivo y sin ZIP: el camino de siempre, que además deja el botón de volver
+  // a descargar. No hay razón para estrenar código en el caso más común.
+  if (items.length === 1 && !enZip) {
+    return procesarConFetch(panel, endpoint, () => formDataDe(items[0]._fileObj));
+  }
+
+  const progressWrap = panel.querySelector('.progress-wrap');
+  const progressFill = panel.querySelector('.progress-fill');
+  const progressPct  = panel.querySelector('.progress-pct');
+  const etiqueta     = panel.querySelector('.progress-label span');
+  const resultBox    = panel.querySelector('.result-box');
+  const btn          = panel.querySelector('.btn-process');
+  const textoEtiqueta = etiqueta ? etiqueta.textContent : '';
+
+  btn.disabled = true;
+  if (resultBox) resultBox.classList.remove('visible');
+  if (progressWrap) progressWrap.classList.add('visible');
+
+  // Progreso de verdad: se sabe cuántos archivos son, no hace falta simularlo.
+  const avance = (hechos) => {
+    const pct = Math.round((hechos / items.length) * 100);
+    if (progressFill) progressFill.style.width = pct + '%';
+    if (progressPct)  progressPct.textContent  = pct + '%';
+    if (etiqueta) {
+      etiqueta.textContent = hechos < items.length
+        ? `Procesando ${hechos + 1} de ${items.length}…`
+        : (enZip ? 'Armando el ZIP…' : 'Terminando…');
+    }
+  };
+
+  const listos = [];   // {nombre, blob}
+  const fallos = [];   // {nombre, motivo}
+  let partesHechas = 0;
+  let avisoPesadas = '';
+
+  try {
+    avance(0);
+    for (const item of items) {
+      const archivo = item._fileObj;
+      try {
+        const res = await fetch(endpoint, { method: 'POST', body: formDataDe(archivo) });
+        if (!res.ok) throw await errorDeLaRespuesta(res);
+        const nombre = nombreDeLaRespuesta(res, archivo.name);
+        const blob   = await res.blob();
+        listos.push({ nombre, blob });
+        // Sueltos: cada uno se descarga en cuanto está, así se ve que avanza.
+        if (!enZip) descargarBlob(blob, nombre);
+      } catch (err) {
+        // Un archivo dañado no puede tumbar la tanda entera: se sigue y se avisa al final.
+        fallos.push({ nombre: archivo.name, motivo: err.message });
+      }
+      avance(listos.length + fallos.length);
+    }
+
+    if (enZip && listos.length) {
+      const entrega = await entregarEnZip(listos, baseZip);
+      partesHechas = entrega.partes;
+      avisoPesadas = entrega.aviso;
+    }
+
+    const pesoEntrada = items.reduce((total, item) => total + item._fileObj.size, 0);
+    const pesoSalida  = listos.reduce((total, r) => total + r.blob.size, 0);
+    const resultName  = panel.querySelector('.result-name');
+    const resultSize  = panel.querySelector('.result-size');
+    const dlBtn       = panel.querySelector('.btn-download');
+    if (resultName) {
+      resultName.textContent = enZip
+        ? `${listos.length} archivos en ${partesHechas} ZIP`
+        : `${listos.length} archivos`;
+    }
+    if (resultSize) {
+      const resumen = `${formatSize(pesoEntrada)} → ${formatSize(pesoSalida)}, se descargaron automáticamente`;
+      resultSize.textContent = avisoPesadas ? `${resumen} · ${avisoPesadas}` : resumen;
+    }
+    // En una tanda el botón descargaría solo uno: engaña más de lo que ayuda.
+    if (dlBtn) dlBtn.hidden = true;
+    if (listos.length && resultBox) resultBox.classList.add('visible');
+
+    if (fallos.length) {
+      showToast(`Error: ${fallos.length} de ${items.length} no se pudieron procesar: ${fallos.map(f => f.nombre).join(', ')}`);
+    } else if (enZip) {
+      showToast(`Listo: ${listos.length} archivos en ${partesHechas} ${partesHechas === 1 ? 'ZIP' : 'ZIP (varias partes para el correo)'}`);
+    } else {
+      showToast(`Listo: ${listos.length} archivos descargados`);
+    }
+    // Lo accionable se dice al final: así es lo que queda en pantalla.
+    if (avisoPesadas) setTimeout(() => showToast(avisoPesadas), 400);
+  } catch (err) {
+    showToast(`Error: ${err.message}`);
+  } finally {
+    stopProgress(progressFill, progressPct);
+    if (progressWrap) progressWrap.classList.remove('visible');
+    if (etiqueta) etiqueta.textContent = textoEtiqueta;
+    btn.disabled = false;
+  }
+}
+
+/** Empaqueta los resultados en partes que caben en el correo. Devuelve {partes, aviso}. */
+async function entregarEnZip(listos, baseZip) {
+  const { partes, pesadas } = repartirEnPartes(listos.map(r => r.blob.size));
+  const nombres = nombrarPartes(baseZip, partes.length);
+
+  for (let i = 0; i < partes.length; i++) {
+    const fd = new FormData();
+    partes[i].forEach(indice => fd.append('archivos', listos[indice].blob, listos[indice].nombre));
+    fd.append('nombre', nombres[i].replace(/\.zip$/, ''));
+    const res = await fetch('/api/empaquetar', { method: 'POST', body: fd });
+    if (!res.ok) throw await errorDeLaRespuesta(res);
+    descargarBlob(await res.blob(), nombreDeLaRespuesta(res, nombres[i]));
+  }
+
+  // El aviso NO se da aquí: el mensaje de "Listo" lo reemplazaría y nadie lo leería.
+  const aviso = pesadas.length ? textoAvisoPesadas(pesadas.map(i => listos[i].nombre)) : '';
+  return { partes: partes.length, aviso };
 }
 
 // ── UNIÓN ─────────────────────────────────────────────────────────
@@ -448,19 +613,24 @@ document.querySelectorAll('input[name="conv-dir"]').forEach(radio => {
     const fileList = zone?.parentElement?.querySelector('.file-list');
     if (fileList) fileList.innerHTML = '';
     
+    // El ZIP solo tiene sentido donde hay varios resultados que empaquetar: en
+    // imagen_a_pdf el resultado es un PDF y en pdf_a_jpg ya es un ZIP de imágenes.
+    const pasoZip = document.getElementById('conv-zip')?.closest('.paso');
+    if (pasoZip) pasoZip.hidden = (tipo === 'imagen_a_pdf' || tipo === 'pdf_a_jpg');
+
     if (input) {
       if (tipo === 'imagen_a_pdf') {
         input.multiple = true;
         input.accept = '.jpg,.jpeg,.png,.bmp,.tiff,.tif,.webp';
-        if (sub) sub.textContent = 'Una o varias imágenes JPG, PNG, BMP, TIFF o WEBP';
+        if (sub) sub.textContent = 'Una o varias imágenes JPG, PNG, BMP, TIFF o WEBP, que se juntan en un solo PDF';
       } else if (tipo === 'pdf_a_jpg') {
         input.multiple = false;
         input.accept = '.pdf';
         if (sub) sub.textContent = 'Un PDF';
       } else {
-        input.multiple = false;
+        input.multiple = true;
         input.accept = '.pdf,.xlsx,.docx';
-        if (sub) sub.textContent = 'PDF, Excel (.xlsx) o Word (.docx)';
+        if (sub) sub.textContent = 'PDF, Excel (.xlsx) o Word (.docx). Puedes elegir varios a la vez: hasta 50 MB cada uno y 100 MB entre todos';
       }
     }
   });
@@ -472,16 +642,27 @@ document.querySelector('#panel-conversion .btn-process')?.addEventListener('clic
   const direccion = panel.querySelector('input[name="conv-dir"]:checked')?.value;
   if (items.length === 0) { showToast('Sube un archivo'); return; }
   if (!direccion)         { showToast('Selecciona la dirección de conversión'); return; }
-  procesarConFetch(panel, '/api/conversion', () => {
+  // imagen_a_pdf junta varias imágenes en UN PDF y pdf_a_jpg ya devuelve un ZIP de
+  // imágenes: ahí una tanda no significa nada. Las otras cuatro son de uno a uno.
+  if (direccion === 'imagen_a_pdf' || direccion === 'pdf_a_jpg') {
+    procesarConFetch(panel, '/api/conversion', () => {
+      const fd = new FormData();
+      if (direccion === 'imagen_a_pdf') {
+        items.forEach(item => fd.append('archivos', item._fileObj));
+      } else {
+        fd.append('archivo', items[0]._fileObj);
+      }
+      fd.append('direccion', direccion);
+      return fd;
+    });
+    return;
+  }
+  procesarTanda(panel, '/api/conversion', (archivo) => {
     const fd = new FormData();
-    if (direccion === 'imagen_a_pdf') {
-      items.forEach(item => fd.append('archivos', item._fileObj));
-    } else {
-      fd.append('archivo', items[0]._fileObj);
-    }
+    fd.append('archivo',   archivo);
     fd.append('direccion', direccion);
     return fd;
-  });
+  }, { baseZip: 'convertidos' });
 });
 
 // ── COMPRESIÓN ────────────────────────────────────────────────────
@@ -490,12 +671,12 @@ document.querySelector('#panel-compresion .btn-process')?.addEventListener('clic
   const items = panel.querySelectorAll('.file-item');
   const nivel = panel.querySelector('input[name="comp-nivel"]:checked')?.value || 'media';
   if (items.length === 0) { showToast('Sube un archivo PDF'); return; }
-  procesarConFetch(panel, '/api/compresion', () => {
+  procesarTanda(panel, '/api/compresion', (archivo) => {
     const fd = new FormData();
-    fd.append('archivo', items[0]._fileObj);
+    fd.append('archivo', archivo);
     fd.append('nivel',   nivel);
     return fd;
-  });
+  }, { baseZip: 'comprimidos' });
 });
 
 // ── CIFRADO ───────────────────────────────────────────────────────
@@ -507,13 +688,15 @@ document.querySelector('#panel-cifrado .btn-process')?.addEventListener('click',
   if (items.length === 0)       { showToast('Sube un archivo PDF'); return; }
   if (!contrasena)              { showToast('Ingresa una contraseña'); return; }
   if (contrasena !== confirmar) { showToast('Las contraseñas no coinciden'); return; }
-  procesarConFetch(panel, '/api/cifrado', () => {
+  // La misma contraseña para toda la tanda: es lo que se espera al proteger una
+  // carpeta de documentos de una vez.
+  procesarTanda(panel, '/api/cifrado', (archivo) => {
     const fd = new FormData();
-    fd.append('archivo',    items[0]._fileObj);
+    fd.append('archivo',    archivo);
     fd.append('contrasena', contrasena);
     fd.append('confirmar',  confirmar);
     return fd;
-  });
+  }, { baseZip: 'protegidos' });
 });
 
 // ── Utilidades ────────────────────────────────────────────────────

@@ -266,6 +266,52 @@ def grupos_por_bloques(total, paginas_por_archivo):
     ]
 
 
+_RE_CONTROL_NOMBRE = re.compile(r'[\x00-\x1f\x7f]')
+
+
+def _nombre_en_zip(nombre, numero):
+    """Nombre seguro para una entrada del ZIP: sin ruta ni controles y acotado.
+
+    Conserva la extensión que traiga (una tanda de Convertir entrega .xlsx o .docx,
+    y renombrarlos a .pdf dejaría archivos que no abren), y tildes y ñ a propósito:
+    `zipfile` las guarda en UTF-8 y quien abre el ZIP ve el nombre que escaneó.
+    """
+    base = os.path.basename((nombre or '').replace('\\', '/'))
+    base = _RE_CONTROL_NOMBRE.sub('', base).strip()
+    raiz, punto, ext = base.rpartition('.')
+    if not punto:
+        raiz, ext = base, 'pdf'
+    raiz = raiz[:120].strip() or f'documento_{numero}'
+    return f'{raiz}.{ext.lower()[:8] or "pdf"}'
+
+
+def empaquetar_en_zip(archivos):
+    """ZIP con los PDF dados, en el orden recibido. `archivos`: [(nombre, datos)].
+
+    **No recomprime** (`ZIP_STORED`): los PDF llegan ya comprimidos, deflate no les
+    quita nada y, sobre todo, así el peso del ZIP es la suma de sus archivos. Eso es
+    lo que permite partir una tanda en partes que caben en el correo sin adivinar.
+    """
+    if not archivos:
+        raise ValueError('No hay ningún archivo para empaquetar')
+
+    out = io.BytesIO()
+    tomados = set()
+    with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_STORED) as zf:
+        for numero, (nombre, datos) in enumerate(archivos, start=1):
+            final = _nombre_en_zip(nombre, numero)
+            if final in tomados:
+                # Dos "factura.pdf" en la misma tanda: numerar en vez de perder uno.
+                raiz, _, ext = final.rpartition('.')
+                copia = 2
+                while f'{raiz}_{copia}.{ext}' in tomados:
+                    copia += 1
+                final = f'{raiz}_{copia}.{ext}'
+            tomados.add(final)
+            zf.writestr(final, datos)
+    return out.getvalue()
+
+
 def dividir_por_grupos(ruta, grupos, base='documento'):
     """ZIP con un PDF por grupo (inicio, fin; páginas desde 1, ambas incluidas), en el orden dado."""
     if not grupos:

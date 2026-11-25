@@ -32,6 +32,7 @@ from .services import (
     dividir_pdf_por_modo,
     dividir_por_grupos,
     docx_a_pdf,
+    empaquetar_en_zip,
     grupos_por_bloques,
     pdf_a_docx,
     pdf_a_xlsx,
@@ -59,6 +60,11 @@ CONVERSIONES = {
     'xlsx-pdf': ('xlsx', 'pdf', xlsx_a_pdf),
 }
 MAX_CONTRASENA = 127  # límite de AES-256 (PDF 2.0)
+# Tope de archivos por ZIP. Una tanda real son 20-40 facturas; el tope solo evita que
+# una petición absurda ocupe el servidor, porque el peso ya lo acota MAX_CONTENT_LENGTH.
+MAX_ARCHIVOS_EMPAQUETAR = 200
+# Lo que la aplicación entrega y por tanto puede volver en un ZIP.
+EXT_EMPAQUETABLES = {'pdf', 'docx', 'xlsx'}
 _RE_CONTROL = re.compile(r'[\x00-\x1f\x7f"]')
 
 
@@ -164,6 +170,40 @@ def error_response(modulo, nombre, tamano, exc):
     log.exception('Error interno en %s (%s)', modulo, nombre)
     registrar_log_seguro(modulo, nombre, tamano, 'error', f'{type(exc).__name__}: {exc}')
     return jsonify({'error': 'Error procesando el archivo. Verifica que no esté dañado e inténtalo de nuevo.'}), 500
+
+
+def recibir_para_empaquetar(campo='archivos'):
+    """Guarda y valida los archivos a empaquetar. Retorna [(ruta, nombre, tamaño)].
+
+    Solo se aceptan los formatos que la propia aplicación entrega (PDF, Excel y Word):
+    el ZIP se arma con resultados de esta herramienta, no con lo que sea.
+
+    Si uno falla no se empaqueta nada: es mejor que la persona corrija ese archivo que
+    recibir un ZIP al que le falta una factura sin que nadie se lo diga.
+    """
+    subidos = [f for f in request.files.getlist(campo) if f and f.filename]
+    if not subidos:
+        raise ValueError('Se requiere al menos un archivo PDF')
+    if len(subidos) > MAX_ARCHIVOS_EMPAQUETAR:
+        raise ValueError(f'No se pueden juntar más de {MAX_ARCHIVOS_EMPAQUETAR} archivos en un ZIP')
+
+    recibidos = []
+    try:
+        for f in subidos:
+            ext = extension(f.filename)
+            if ext not in EXT_EMPAQUETABLES:
+                raise ValueError('En el ZIP solo caben archivos PDF, Excel (.xlsx) o Word (.docx)')
+            ruta, _ = guardar_temporal(f, current_app.config['UPLOAD_FOLDER'])
+            recibidos.append((ruta, f.filename, os.path.getsize(ruta)))
+            es_valido, msg_error = validar_mime_type(ruta, ext)
+            if es_valido and ext == 'pdf':
+                es_valido, msg_error = validar_pdf(ruta)
+            if not es_valido:
+                raise ValueError(msg_error or f'El archivo no es un .{ext} válido')
+    except Exception:
+        eliminar_temporales(*[ruta for ruta, _, _ in recibidos])
+        raise
+    return recibidos
 
 
 def recibir_pdf(campo='archivo'):
@@ -419,6 +459,37 @@ def compresion():
         return error_response('compresion', nombre, tamano, e)
     finally:
         eliminar_temporales(ruta)
+
+
+# ── Empaquetado ───────────────────────────────────────────────────
+
+@bp.route('/api/empaquetar', methods=['POST'])
+def empaquetar():
+    """Junta en un ZIP los PDF que el navegador ya procesó, uno por uno.
+
+    El navegador procesa la tanda archivo por archivo (cada petición sigue bajo el
+    tope de peso de siempre) y, si se pidió un solo ZIP, manda aquí los resultados
+    en partes que caben en el correo. El peso de cada parte se decide allí, donde ya
+    se conoce el tamaño de lo comprimido.
+    """
+    recibidos, nombre, tamano = [], 'archivos', 0
+    try:
+        recibidos = recibir_para_empaquetar()
+        tamano = sum(t for _, _, t in recibidos)
+        nombre = f'{len(recibidos)} archivos'
+        contenido = []
+        for ruta, nombre_original, _ in recibidos:
+            with open(ruta, 'rb') as f:
+                contenido.append((nombre_original, f.read()))
+        resultado = empaquetar_en_zip(contenido)
+        base = nombre_base(request.form.get('nombre'), defecto='documentos')
+        return log_y_enviar('empaquetado', nombre, tamano, resultado,
+                            f'{base}.zip', 'application/zip',
+                            detalle=f'archivos={len(recibidos)}; {len(resultado)} bytes')
+    except Exception as e:
+        return error_response('empaquetado', nombre, tamano, e)
+    finally:
+        eliminar_temporales(*[ruta for ruta, _, _ in recibidos])
 
 
 # ── Cifrado ───────────────────────────────────────────────────────

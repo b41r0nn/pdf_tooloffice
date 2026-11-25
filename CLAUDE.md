@@ -21,6 +21,10 @@ El `README.md` explica qué hace la aplicación. Este archivo explica cómo trab
   IA en commits ni en PR. Regla permanente del dueño.
 - **Finales de línea LF**, forzado en `.gitattributes`. El contenedor corre en Linux y con
   CRLF el Dockerfile falla.
+  Para COMPROBARLO no sirve `grep -c $''` en Git Bash: la cuenta sale igual al número
+  de líneas (el patrón llega vacío). Usa `git ls-files --eol` o
+  `python -c "b=open(f,'rb').read(); print(b.count(b'
+'))"`.
 - **Accesibilidad:** controles que son `<button>` de verdad, `aria-label` que nombra lo que
   afecta, foco visible, contraste AA. Nada comunicado solo por color.
 - **Responsivo de 320 a 1440 px** sin desbordes horizontales. Se verifica, no se supone.
@@ -69,6 +73,29 @@ solo adelanta la cuenta de archivos. **Si tocas una, tienes que tocar la otra**:
 de pruebas de paridad lo exigen, incluida una que recorre los 63 488 caracteres del plano
 básico comprobando que ambas recortan los mismos espacios.
 
+**Una tanda se procesa archivo por archivo, no en una sola petición.** `procesarTanda`
+(`main.js`) manda una petición por archivo al endpoint de siempre, así que el tope de peso
+del servidor (`MAX_CONTENT_LENGTH`, 50 MB) no se toca. Los 100 MB de la tanda son del
+navegador: se comprueban al elegir los archivos. Si hay un solo archivo y sin ZIP,
+`procesarTanda` **delega en `procesarConFetch`**, el camino de siempre, que es el que deja
+el botón de volver a descargar.
+
+**El reparto en partes vive SOLO en el navegador** (`tandas.js`), al contrario que la
+sintaxis de grupos. El motivo: las partes se deciden por el peso de lo YA procesado, que
+solo se conoce ahí. Por eso `services.empaquetar_en_zip` usa `ZIP_STORED` y **no
+recomprime**: el peso del ZIP es la suma de sus archivos y las partes salen exactas. Si
+alguna vez se recomprime, el reparto por el tope del correo deja de ser fiable.
+
+**`/api/empaquetar` acepta PDF, XLSX y DOCX** (`EXT_EMPAQUETABLES`), que es lo que la
+aplicación entrega: una tanda de Convertir produce `.xlsx`. Las entradas del ZIP conservan
+su extensión y sus tildes, y los nombres repetidos se numeran (`factura_2.pdf`) en vez de
+pisarse.
+
+**En Convertir, `multiple` lo decide el manejador del radio**, no la plantilla: `imagen_a_pdf`
+junta varias imágenes en UN PDF y `pdf_a_jpg` ya devuelve un ZIP propio, así que ahí la
+casilla del ZIP se esconde (`#conv-zip`, el paso entero con `hidden`). `procesarTanda`
+ignora la casilla si su paso está escondido.
+
 **La vista de páginas deriva los grupos de dos conjuntos** (páginas descartadas y puntos de
 corte) y nunca los guarda. Cortar, unir y descartar son operaciones sobre esos conjuntos.
 El invariante que sostiene todo: **la vista y el campo de texto no pueden discrepar**,
@@ -91,14 +118,24 @@ porque el servidor actúa sobre el texto. `refrescar()` es el único que escribe
 - `?v=<mtime>` se añade solo a las URLs estáticas (`url_defaults` en `__init__.py`), menos
   a `fonts/`. El JS no puede escribir rutas a mano: llegan desde la plantilla en `data-…`.
 
+**Avisos en la pantalla**
+- **`showToast` REEMPLAZA el aviso anterior.** Un aviso dado antes del mensaje final
+  («Listo: …») no se lee nunca. Lo accionable va al final y además al `.result-box`, que
+  es `role="status"` y no se borra solo. Pasó con el aviso del archivo que no cabe en el
+  correo: estaba bien calculado y era invisible.
+- El nombre con el que se descarga sale del `Content-Disposition`, y el ayudante toma el
+  `filename=` ASCII, no el `filename*=UTF-8''…`. Por eso «facturación.pdf» se descarga
+  como «facturacion.pdf» (y así entra al ZIP). Es de antes de las tandas; si se cambia,
+  cambia para todas las herramientas.
+
 **CSS**
 - `var()` dentro de una propiedad personalizada se resuelve **donde se declara**. Por eso
   `--marca: var(--acento)` va en `body` y no en `:root`.
 
 ## Si vas a verificar algo en el navegador
 
-Chrome headless por CDP con Node (que ya trae `WebSocket`). **Cinco errores de medición
-reales en una sola sesión, todos atribuidos primero a la aplicación y ninguno cierto:**
+Chrome headless por CDP con Node (que ya trae `WebSocket`). **Errores de medición reales,
+atribuidos primero a la aplicación y ninguno cierto:**
 
 1. **Navegar a la misma URL con el mismo `#hash` NO recarga la página.** El DOM sobrevive
    entre vueltas y los conmutadores alternan. Añade una consulta única por iteración.
@@ -110,6 +147,12 @@ reales en una sola sesión, todos atribuidos primero a la aplicación y ninguno 
    y la acción no ocurre. Envuelve cada evaluación en una IIFE.
 5. **`Page.captureScreenshot` con `captureBeyondViewport` se cuelga** si hay lienzos de
    PDF.js. Usa ventana alta y captura solo el viewport.
+6. **El objetivo del navegador NO atiende `Page.navigate` ni `Runtime.evaluate`.** El
+   `webSocketDebuggerUrl` de `/json/version` es el del navegador; hay que pedir
+   `/json/list` y conectarse al objetivo de tipo `page`.
+7. **Lo que no se puede provocar con archivos de 1 KB se provoca sustituyendo la función
+   ya probada.** El ZIP partido en varias partes se verificó reemplazando
+   `window.repartirEnPartes` (probada con node) para ejercitar el ENVÍO de las partes.
 
 Y la regla de fondo: **comprueba la herramienta de medición antes de acusar al código.**
 

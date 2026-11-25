@@ -1,4 +1,5 @@
 import hashlib
+import io
 import logging
 import time
 
@@ -6,6 +7,7 @@ import pymupdf as fitz
 import pytest
 
 from app import services
+from app.database import obtener_logs
 
 CLAVE = 'clave-de-prueba-2026'
 MENSAJE_RESTRICCIONES = (
@@ -262,3 +264,77 @@ def test_comprobacion_registra_el_motivo_sin_contenido_del_pdf(caplog):
 
     assert 'páginas esperadas 2, obtenidas 1' in caplog.text
     assert 'Pagina 1' not in caplog.text
+
+
+# ── Endpoint /api/desbloqueo ──────────────────────────────────────
+
+CLAVE_MALA = 'clave-mala-secreta-998'
+
+
+def _archivo(datos, nombre='contrato.pdf'):
+    return (io.BytesIO(datos), nombre)
+
+
+def test_desbloqueo_devuelve_un_pdf_que_abre_sin_contrasena(client):
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                             'contrasena': CLAVE})
+
+    assert r.status_code == 200
+    assert r.mimetype == 'application/pdf'
+    assert 'contrato_sin_contrasena.pdf' in r.headers['Content-Disposition']
+    with fitz.open(stream=r.data, filetype='pdf') as doc:
+        assert doc.needs_pass == 0
+
+
+def test_desbloqueo_con_contrasena_mala_da_400_con_mensaje_claro(client):
+    r = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                             'contrasena': CLAVE_MALA})
+
+    assert r.status_code == 400
+    assert 'contraseña' in r.get_json()['error']
+    assert CLAVE_MALA not in r.get_data(as_text=True)
+
+
+def test_desbloqueo_sin_archivo_da_400(client):
+    r = client.post('/api/desbloqueo', data={'contrasena': CLAVE})
+
+    assert r.status_code == 400
+    assert 'PDF' in r.get_json()['error']
+
+
+def test_desbloqueo_de_un_pdf_restringido_necesita_la_casilla(client):
+    sin_casilla = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_solo_restringido())})
+
+    assert sin_casilla.status_code == 400
+    assert sin_casilla.get_json()['error'] == MENSAJE_RESTRICCIONES
+
+    con_casilla = client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_solo_restringido()),
+                                                       'quitar_restricciones': 'true'})
+
+    assert con_casilla.status_code == 200
+    assert _libre(con_casilla.data)
+
+
+def test_el_log_no_guarda_la_contrasena(client, app):
+    client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena()),
+                                         'contrasena': CLAVE})
+    client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena(), 'fallo.pdf'),
+                                         'contrasena': CLAVE_MALA})
+
+    filas = obtener_logs(app.config['DATABASE_PATH'])
+    modulos = {fila['modulo'] for fila in filas}
+    assert 'desbloqueo' in modulos
+    for fila in filas:
+        for valor in fila.values():
+            assert CLAVE not in str(valor)
+            assert CLAVE_MALA not in str(valor)
+
+
+def test_el_error_queda_en_el_log_con_el_nombre_del_archivo(client, app):
+    client.post('/api/desbloqueo', data={'archivo': _archivo(pdf_con_contrasena(), 'fallo.pdf'),
+                                         'contrasena': CLAVE_MALA})
+
+    fila = obtener_logs(app.config['DATABASE_PATH'], limit=1)[0]
+    assert fila['modulo'] == 'desbloqueo'
+    assert fila['resultado'] == 'error'
+    assert fila['archivo'] == 'fallo.pdf'

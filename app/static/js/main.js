@@ -680,12 +680,38 @@ document.querySelector('#panel-compresion .btn-process')?.addEventListener('clic
 });
 
 // ── CIFRADO ───────────────────────────────────────────────────────
+// Dos modos en el mismo panel: poner la contraseña (/api/cifrado) o quitarla
+// (/api/desbloqueo). Sin ámbito propio: todo cuelga de los eventos, no de nombres globales.
+document.querySelectorAll('input[name="cif-modo"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const quitar = document.getElementById('cif-modo-quitar').checked;
+    document.getElementById('paso-poner').hidden  = quitar;
+    document.getElementById('paso-quitar').hidden = !quitar;
+    document.getElementById('cif-btn-texto').textContent = quitar ? 'Quitar contraseña' : 'Proteger PDF';
+  });
+});
+
 document.querySelector('#panel-cifrado .btn-process')?.addEventListener('click', () => {
-  const panel      = document.getElementById('panel-cifrado');
-  const items      = panel.querySelectorAll('.file-item');
+  const panel = document.getElementById('panel-cifrado');
+  const items = panel.querySelectorAll('.file-item');
+  if (items.length === 0) { showToast('Sube un archivo PDF'); return; }
+
+  if (document.getElementById('cif-modo-quitar').checked) {
+    // Quitar: no se exige contraseña. Un PDF solo restringido no tiene ninguna.
+    const contrasena = document.getElementById('cif-pass-actual')?.value || '';
+    const quitarRestricciones = document.getElementById('cif-restricciones')?.checked ? 'true' : 'false';
+    procesarTanda(panel, '/api/desbloqueo', (archivo) => {
+      const fd = new FormData();
+      fd.append('archivo',              archivo);
+      fd.append('contrasena',           contrasena);
+      fd.append('quitar_restricciones', quitarRestricciones);
+      return fd;
+    }, { baseZip: 'sin_contrasena' });
+    return;
+  }
+
   const contrasena = document.getElementById('pass1')?.value || '';
   const confirmar  = document.getElementById('pass2')?.value || '';
-  if (items.length === 0)       { showToast('Sube un archivo PDF'); return; }
   if (!contrasena)              { showToast('Ingresa una contraseña'); return; }
   if (contrasena !== confirmar) { showToast('Las contraseñas no coinciden'); return; }
   // La misma contraseña para toda la tanda: es lo que se espera al proteger una

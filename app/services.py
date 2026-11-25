@@ -785,21 +785,30 @@ def tiene_restricciones(doc):
 
 
 def _comprobar_desbloqueo(datos, doc_original):
-    """Reabre el resultado y exige lo mismo que el original: sin contraseña, mismas páginas y mismo texto."""
+    """
+    Reabre el resultado y exige lo mismo que el original: sin contraseña, sin restricciones
+    (se guarda sin cifrar, así que siempre debe salir libre), mismas páginas y mismo texto.
+    Si falla, es un defecto nuestro: se registra (sin contenido del PDF) y se avisa.
+    """
     with fitz.open(stream=datos, filetype='pdf') as resultado:
-        ok = (
-            resultado.needs_pass == 0
-            and resultado.page_count == doc_original.page_count
-            and all(
-                pagina_nueva.get_text() == pagina_original.get_text()
-                for pagina_nueva, pagina_original in zip(resultado, doc_original)
-            )
+        paginas_ok = resultado.page_count == doc_original.page_count
+        texto_ok = paginas_ok and all(
+            pagina_nueva.get_text() == pagina_original.get_text()
+            for pagina_nueva, pagina_original in zip(resultado, doc_original)
         )
-    if not ok:
-        raise ValueError(
-            'El PDF se desbloqueó pero el resultado no coincide con el original, así que no se entrega. '
-            'Avisa a Sistemas con el nombre del archivo.'
-        )
+        libre = resultado.needs_pass == 0 and not tiene_restricciones(resultado)
+        paginas_esperadas, paginas_obtenidas = doc_original.page_count, resultado.page_count
+    if paginas_ok and texto_ok and libre:
+        return
+    log.error(
+        'Desbloqueo descartado: páginas esperadas %d, obtenidas %d; texto igual: %s; '
+        'sin contraseña y sin restricciones: %s',
+        paginas_esperadas, paginas_obtenidas, texto_ok, libre,
+    )
+    raise ValueError(
+        'El PDF se desbloqueó pero el resultado no coincide con el original, así que no se entrega. '
+        'Avisa a Sistemas con el nombre del archivo.'
+    )
 
 
 def desbloquear_pdf(ruta_pdf, contrasena='', quitar_restricciones=False):

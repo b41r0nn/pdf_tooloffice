@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import time
 
 import pymupdf as fitz
@@ -54,6 +55,26 @@ def pdf_escaneado_con_contrasena(clave=CLAVE):
         pix.set_rect(pix.irect, (200, 200, 200))
         pagina.insert_image(pagina.rect, pixmap=pix)
         return doc.tobytes(encryption=fitz.PDF_ENCRYPT_AES_256, user_pw=clave, owner_pw=clave)
+
+
+def pdf_con_contrasena_y_restringido(clave=CLAVE):
+    """Pide contraseña para abrirse y, además, va sin permiso de imprimir ni copiar."""
+    with fitz.open() as doc:
+        pagina = doc.new_page()
+        pagina.insert_text((72, 100), 'Pagina 1 del documento de prueba', fontsize=12)
+        return doc.tobytes(
+            encryption=fitz.PDF_ENCRYPT_AES_256,
+            user_pw=clave,
+            owner_pw='duenio-2026',
+            permissions=int(fitz.PDF_PERM_ACCESSIBILITY),
+        )
+
+
+def _pdf_con_textos(textos, **guardado):
+    with fitz.open() as doc:
+        for texto in textos:
+            doc.new_page().insert_text((72, 100), texto, fontsize=12)
+        return doc.tobytes(**guardado)
 
 
 def _en_archivo(tmp_path, datos, nombre='entrada.pdf'):
@@ -192,3 +213,52 @@ def test_el_archivo_original_no_cambia(tmp_path):
 
     despues = hashlib.sha256(open(ruta, 'rb').read()).hexdigest()
     assert antes == despues
+
+
+def test_con_contrasena_y_restricciones_sin_marcar_la_casilla_sale_libre(tmp_path):
+    # Decisión del diseño aprobado: los permisos viven en el cifrado y se van con la contraseña.
+    ruta = _en_archivo(tmp_path, pdf_con_contrasena_y_restringido())
+
+    resultado = services.desbloquear_pdf(ruta, CLAVE, quitar_restricciones=False)
+
+    assert _libre(resultado)
+
+
+def test_comprobacion_rechaza_resultado_con_distinto_numero_de_paginas():
+    original = pdf_sin_cifrar(paginas=2)
+    with fitz.open(stream=original, filetype='pdf') as doc_original:
+        with pytest.raises(ValueError, match='no coincide'):
+            services._comprobar_desbloqueo(pdf_sin_cifrar(paginas=1), doc_original)
+
+
+def test_comprobacion_rechaza_texto_distinto_en_una_pagina():
+    original = _pdf_con_textos(['Pagina 1 del documento', 'Pagina 2 del documento'])
+    alterado = _pdf_con_textos(['Pagina 1 del documento', 'Pagina 2 alterada'])
+    with fitz.open(stream=original, filetype='pdf') as doc_original:
+        with pytest.raises(ValueError, match='no coincide'):
+            services._comprobar_desbloqueo(alterado, doc_original)
+
+
+def test_comprobacion_rechaza_resultado_que_sigue_restringido():
+    original = _pdf_con_textos(['Pagina 1 del documento'])
+    restringido = _pdf_con_textos(
+        ['Pagina 1 del documento'],
+        encryption=fitz.PDF_ENCRYPT_AES_256,
+        owner_pw='duenio-2026',
+        user_pw='',
+        permissions=int(fitz.PDF_PERM_ACCESSIBILITY),
+    )
+    with fitz.open(stream=original, filetype='pdf') as doc_original:
+        with pytest.raises(ValueError, match='no coincide'):
+            services._comprobar_desbloqueo(restringido, doc_original)
+
+
+def test_comprobacion_registra_el_motivo_sin_contenido_del_pdf(caplog):
+    original = pdf_sin_cifrar(paginas=2)
+    with fitz.open(stream=original, filetype='pdf') as doc_original:
+        with caplog.at_level(logging.ERROR, logger='app.services'):
+            with pytest.raises(ValueError):
+                services._comprobar_desbloqueo(pdf_sin_cifrar(paginas=1), doc_original)
+
+    assert 'páginas esperadas 2, obtenidas 1' in caplog.text
+    assert 'Pagina 1' not in caplog.text

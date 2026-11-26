@@ -336,6 +336,7 @@ async function procesarConFetch(panel, endpoint, buildFormData) {
     if (dlBtn) {
       dlBtn.href     = url;
       dlBtn.download = filename;
+      dlBtn.hidden   = false;  // una tanda o un cambio de modo pudo esconderlo
     }
 
     // Descarga automática
@@ -475,6 +476,19 @@ async function procesarTanda(panel, endpoint, formDataDe, { baseZip = 'archivos'
     // En una tanda el botón descargaría solo uno: engaña más de lo que ayuda.
     if (dlBtn) dlBtn.hidden = true;
     if (listos.length && resultBox) resultBox.classList.add('visible');
+
+    if (fallos.length && resultBox) {
+      // Los motivos piden acciones distintas: se dejan en el recuadro, que no se borra solo.
+      const porMotivo = new Map();
+      for (const f of fallos) {
+        if (!porMotivo.has(f.motivo)) porMotivo.set(f.motivo, []);
+        porMotivo.get(f.motivo).push(f.nombre);
+      }
+      const detalle = [...porMotivo].map(([motivo, nombres]) => `${nombres.length} (${motivo}): ${nombres.join(', ')}`).join(' · ');
+      if (resultName) resultName.textContent = listos.length ? `${listos.length} de ${items.length} listos` : 'No se pudo procesar ninguno';
+      if (resultSize) resultSize.textContent = `No se procesaron ${detalle}`;
+      resultBox.classList.add('visible');
+    }
 
     if (fallos.length) {
       showToast(`Error: ${fallos.length} de ${items.length} no se pudieron procesar: ${fallos.map(f => f.nombre).join(', ')}`);
@@ -680,12 +694,77 @@ document.querySelector('#panel-compresion .btn-process')?.addEventListener('clic
 });
 
 // ── CIFRADO ───────────────────────────────────────────────────────
+// Dos modos en el mismo panel: poner la contraseña (/api/cifrado) o quitarla
+// (/api/desbloqueo). Sin ámbito propio: todo cuelga de los eventos, no de nombres globales.
+// La sincronización va en una IIFE y se ejecuta al cargar y al volver a la página
+// (pageshow), para que lo que se ve siempre sea el modo que está marcado.
+(() => {
+  // Los textos de cada modo viven aquí: no hay nombres nuevos en el ámbito global.
+  const TEXTOS = {
+    poner: {
+      titulo: 'Proteger con contraseña',
+      desc: 'Cifra el PDF: solo quien tenga la contraseña podrá abrirlo.',
+      archivos: 'Elegir los PDF a proteger',
+    },
+    quitar: {
+      titulo: 'Quitar la contraseña',
+      desc: 'Devuelve un PDF nuevo que se abre sin pedir contraseña. El original no se toca.',
+      archivos: 'Elegir los PDF a desbloquear',
+    },
+  };
+  const sincronizarModo = () => {
+    const quitar = !!document.getElementById('cif-modo-quitar')?.checked;
+    const textos = quitar ? TEXTOS.quitar : TEXTOS.poner;
+    const panel = document.getElementById('panel-cifrado');
+    const pasoPoner = document.getElementById('paso-poner');
+    const pasoQuitar = document.getElementById('paso-quitar');
+    if (pasoPoner) pasoPoner.hidden = quitar;
+    if (pasoQuitar) pasoQuitar.hidden = !quitar;
+    const textoBoton = document.getElementById('cif-btn-texto');
+    if (textoBoton) textoBoton.textContent = quitar ? 'Quitar contraseña' : 'Proteger PDF';
+    const etiqueta = document.querySelector('#panel-cifrado .progress-label span');
+    if (etiqueta) etiqueta.textContent = quitar ? 'Quitando la contraseña…' : 'Cifrando…';
+    const titulo = panel?.querySelector('.panel-title');
+    if (titulo) titulo.textContent = textos.titulo;
+    const desc = panel?.querySelector('.panel-desc');
+    if (desc) desc.textContent = textos.desc;
+    panel?.querySelector('input[type="file"]')?.setAttribute('aria-label', textos.archivos);
+    // El candado cerrado solo tiene sentido al poner la contraseña
+    const candado = panel?.querySelector('.btn-process svg');
+    if (candado) candado.style.display = quitar ? 'none' : '';
+    // El resultado del modo anterior no debe quedar a la vista con su descarga
+    panel?.querySelector('.result-box')?.classList.remove('visible');
+    const descarga = panel?.querySelector('.btn-download');
+    if (descarga) descarga.hidden = true;
+  };
+  document.querySelectorAll('input[name="cif-modo"]').forEach(radio => {
+    radio.addEventListener('change', sincronizarModo);
+  });
+  window.addEventListener('pageshow', sincronizarModo);
+  sincronizarModo();
+})();
+
 document.querySelector('#panel-cifrado .btn-process')?.addEventListener('click', () => {
-  const panel      = document.getElementById('panel-cifrado');
-  const items      = panel.querySelectorAll('.file-item');
+  const panel = document.getElementById('panel-cifrado');
+  const items = panel.querySelectorAll('.file-item');
+  if (items.length === 0) { showToast('Sube un archivo PDF'); return; }
+
+  if (document.getElementById('cif-modo-quitar').checked) {
+    // Quitar: no se exige contraseña. Un PDF solo restringido no tiene ninguna.
+    const contrasena = document.getElementById('cif-pass-actual')?.value || '';
+    const quitarRestricciones = document.getElementById('cif-restricciones')?.checked ? 'true' : 'false';
+    procesarTanda(panel, '/api/desbloqueo', (archivo) => {
+      const fd = new FormData();
+      fd.append('archivo',              archivo);
+      fd.append('contrasena',           contrasena);
+      fd.append('quitar_restricciones', quitarRestricciones);
+      return fd;
+    }, { baseZip: 'sin_contrasena' });
+    return;
+  }
+
   const contrasena = document.getElementById('pass1')?.value || '';
   const confirmar  = document.getElementById('pass2')?.value || '';
-  if (items.length === 0)       { showToast('Sube un archivo PDF'); return; }
   if (!contrasena)              { showToast('Ingresa una contraseña'); return; }
   if (contrasena !== confirmar) { showToast('Las contraseñas no coinciden'); return; }
   // La misma contraseña para toda la tanda: es lo que se espera al proteger una

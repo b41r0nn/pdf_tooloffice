@@ -28,6 +28,7 @@ from .services import (
     contar_paginas,
     convertir_imagenes_a_pdf,
     convertir_pdf_a_jpg,
+    desbloquear_pdf,
     dividir_pdf,
     dividir_pdf_por_modo,
     dividir_por_grupos,
@@ -511,6 +512,26 @@ def cifrado():
                             f'{nombre_base(nombre)}_cifrado.pdf', MIMETYPES['pdf'], detalle='AES-256')
     except Exception as e:
         return error_response('cifrado', nombre, tamano, e)
+    finally:
+        eliminar_temporales(ruta)
+
+
+@bp.route('/api/desbloqueo', methods=['POST'])
+def desbloqueo():
+    ruta, nombre, tamano = None, 'archivo.pdf', 0
+    try:
+        contrasena = request.form.get('contrasena', '')
+        quitar = request.form.get('quitar_restricciones') == 'true'
+        ruta, nombre, tamano = recibir_pdf()
+        resultado = desbloquear_pdf(ruta, contrasena, quitar_restricciones=quitar)
+        # Lo que se PIDIÓ, no lo que pasó: el resultado sale siempre sin restricciones
+        # (se guarda con PDF_ENCRYPT_NONE), también cuando la casilla no está marcada.
+        casilla = 'sí' if quitar else 'no'
+        return log_y_enviar('desbloqueo', nombre, tamano, resultado,
+                            f'{nombre_base(nombre)}_sin_contrasena.pdf', MIMETYPES['pdf'],
+                            detalle=f'casilla de restricciones: {casilla}; {len(resultado)} bytes')
+    except Exception as e:
+        return error_response('desbloqueo', nombre, tamano, e)
     finally:
         eliminar_temporales(ruta)
 

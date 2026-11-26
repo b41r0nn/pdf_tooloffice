@@ -430,6 +430,20 @@
 
     <ol class="hoja pasos">
       <li class="card paso">
+        <h2 class="paso-titulo">¿Qué quieres hacer?</h2>
+        <div class="pill-group" role="radiogroup" aria-label="Qué hacer con la contraseña">
+          <div class="pill-option">
+            <input type="radio" name="cif-modo" id="cif-modo-poner" value="poner" checked autocomplete="off">
+            <label for="cif-modo-poner">Poner contraseña</label>
+          </div>
+          <div class="pill-option">
+            <input type="radio" name="cif-modo" id="cif-modo-quitar" value="quitar" autocomplete="off">
+            <label for="cif-modo-quitar">Quitar contraseña</label>
+          </div>
+        </div>
+      </li>
+
+      <li class="card paso">
         <h2 class="paso-titulo">Elige el PDF</h2>
         <div class="upload-zone">
           <input type="file" accept=".pdf" multiple aria-label="Elegir los PDF a proteger">
@@ -442,7 +456,7 @@
         <div class="file-list"></div>
       </li>
 
-      <li class="card paso">
+      <li class="card paso" id="paso-poner">
         <h2 class="paso-titulo">Escribe la contraseña</h2>
         <div class="form-row">
           <div class="form-group">
@@ -466,6 +480,25 @@
         </div>
         <p class="form-hint">Guárdala en un lugar seguro: si se pierde, el PDF no se puede abrir.</p>
       </li>
+
+      <li class="card paso" id="paso-quitar" hidden>
+        <h2 class="paso-titulo">Escribe la contraseña actual</h2>
+        <div class="form-group">
+          <label class="form-label" for="cif-pass-actual">Contraseña actual</label>
+          <div class="campo-clave">
+            <input type="password" id="cif-pass-actual" class="form-input" placeholder="Contraseña del PDF" autocomplete="off" aria-describedby="cif-pass-actual-nota">
+            <button type="button" class="btn-ojo" onclick="togglePass('cif-pass-actual',this)" aria-label="Mostrar contraseña" aria-pressed="false">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+          </div>
+        </div>
+        <p class="form-hint" id="cif-pass-actual-nota">Déjalo vacío si el PDF se abre sin pedir contraseña.</p>
+        <label class="check" for="cif-restricciones">
+          <input type="checkbox" id="cif-restricciones" aria-describedby="cif-restricciones-nota"> Quitar también las restricciones de impresión y copia
+        </label>
+        <p class="form-hint" id="cif-restricciones-nota">Solo hace falta para un PDF que se abre sin contraseña: si el PDF pide contraseña, sus restricciones se van con ella.</p>
+      </li>
+
       <li class="card paso">
         <h2 class="paso-titulo">¿Todo en un ZIP? <span class="opcional">opcional</span></h2>
         <label class="check" for="cif-zip">
@@ -479,7 +512,7 @@
     <div class="action-bar">
       <button type="button" class="btn-primary btn-process">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        Proteger PDF
+        <span id="cif-btn-texto">Proteger PDF</span>
       </button>
     </div>
 
